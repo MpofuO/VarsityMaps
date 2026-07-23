@@ -1,9 +1,11 @@
 using API.Entities;
+using NetTopologySuite.Geometries;
+using Route = API.Entities.Route;
 
 namespace API.Interfaces;
 
 public interface IRouteService
 {
-    API.Entities.Route GetShortestPath(List<Edge> edges);
-    List<string> GetRouteGuides(API.Entities.Route route);
+    Route GetShortestPath(List<Edge> edges);
+    List<Tuple<Point, string>> GetRouteGuides(Route route);
 }

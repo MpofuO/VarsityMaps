@@ -9,5 +9,5 @@ public class Application
     public int CampusCount { get; set; }
     public DateTime DateCreated { get; set; }
     public bool? IsApproved { get; set; }
-    public string? Notes { get; set; }
+    public string DecisionReason { get; set; } = string.Empty;
 }

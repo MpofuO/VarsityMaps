@@ -1,5 +1,6 @@
 using API.Entities;
 using API.Interfaces;
+using NetTopologySuite.Geometries;
 using Route = API.Entities.Route;
 
 namespace API.Services;
@@ -11,7 +12,7 @@ public class RouteService : IRouteService
         return new Route();
     }
 
-    public List<string> GetRouteGuides(Route route)
+    public List<Tuple<Point, string>> GetRouteGuides(Route route)
     {
         return [];
     }

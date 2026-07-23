@@ -33,6 +33,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         builder.Entity<Application>().ToTable("Application");
 
 
+        builder.Entity<Building>(entity =>
+        {
+            entity.Property(e => e.Boundary)
+                .HasColumnType("geometry");
+        });
+        builder.Entity<Node>(entity =>
+        {
+            entity.Property(e => e.Location)
+                .HasColumnType("geometry");
+        });
+        builder.Entity<Route>(entity =>
+        {
+            entity.Property(e => e.Path)
+                .HasColumnType("geometry");
+        });
+
+        builder.Entity<Edge>(entity =>
+        {
+            entity.Property(e => e.Weight)
+                .HasPrecision(10, 2);
+        });
+        builder.Entity<Route>(entity =>
+        {
+            entity.Property(e => e.Weight)
+                .HasPrecision(10, 2);
+        });
+
+
         builder.Entity<University>()
             .HasMany(u => u.Campuses)
             .WithOne(c => c.University)
@@ -46,34 +74,33 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         builder.Entity<Campus>()
             .HasMany(c => c.Nodes)
             .WithOne(n => n.Campus)
-            .HasForeignKey(n => n.CampusId);
-
-        builder.Entity<Campus>()
-            .HasMany(c => c.Edges)
-            .WithOne(e => e.Campus)
-            .HasForeignKey(e => e.CampusId);
+            .HasForeignKey(n => n.CampusId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.Entity<Building>()
             .HasMany(b => b.Entrances)
             .WithOne(n => n.Building)
-            .HasForeignKey(n => n.BuildingId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(n => n.BuildingId);
 
         builder.Entity<Node>()
             .HasMany(n => n.OutgoingEdges)
             .WithOne(e => e.FromNode)
-            .HasForeignKey(e => e.FromNodeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(e => e.FromNodeId);
 
         builder.Entity<Node>()
             .HasMany(n => n.IncomingEdges)
             .WithOne(e => e.ToNode)
             .HasForeignKey(e => e.ToNodeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.Entity<Route>()
             .HasMany(r => r.Checkpoints)
             .WithOne(c => c.Route)
             .HasForeignKey(c => c.RouteId);
+
+        builder.Entity<Invitation>()
+            .HasOne(i => i.Campus)
+            .WithOne(c => c.Invitation)
+            .HasForeignKey<Invitation>(i => i.CampusId);
     }
 }
