@@ -14,6 +14,10 @@ public class UnitOfWork : IUnitOfWork
         BuildingRepository = new BuildingRepository(_context);
         NodeRepository = new NodeRepository(_context);
         EdgeRepository = new EdgeRepository(_context);
+        RouteRepository = new RouteRepository(_context);
+        CheckpointRepository = new CheckpointRepository(_context);
+        ApplicationRepository = new ApplicationRepository(_context);
+        InvitationRepository = new InvitationRepository(_context);
     }
 
     public IUniversityRepository UniversityRepository { get; }
@@ -21,9 +25,13 @@ public class UnitOfWork : IUnitOfWork
     public IBuildingRepository BuildingRepository { get; }
     public INodeRepository NodeRepository { get; }
     public IEdgeRepository EdgeRepository { get; }
+    public IRouteRepository RouteRepository { get; }
+    public ICheckpointRepository CheckpointRepository { get; }
+    public IApplicationRepository ApplicationRepository { get; }
+    public IInvitationRepository InvitationRepository { get; }
 
-    public async Task<int> CompleteAsync()
+    public async Task<bool> CompleteAsync()
     {
-        return await _context.SaveChangesAsync();
+        return await _context.SaveChangesAsync() > 0;
     }
 }

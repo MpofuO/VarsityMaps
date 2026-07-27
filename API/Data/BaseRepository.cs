@@ -5,39 +5,35 @@ namespace API.Data;
 
 public class BaseRepository<T> : IBaseRepository<T> where T : class
 {
-    protected readonly AppDbContext Context;
+    protected AppDbContext context;
 
-    public BaseRepository(AppDbContext context)
+    public BaseRepository(AppDbContext _context)
     {
-        Context = context;
+        context = _context;
     }
 
-    public async Task<T> CreateAsync(T entity)
+    public async Task CreateAsync(T entity)
     {
-        await Context.Set<T>().AddAsync(entity);
-        await Context.SaveChangesAsync();
-        return entity;
+        await context.Set<T>().AddAsync(entity);
     }
 
     public async Task DeleteAsync(T entity)
     {
-        Context.Set<T>().Remove(entity);
-        await Context.SaveChangesAsync();
+        context.Set<T>().Remove(entity);
     }
 
     public async Task<IEnumerable<T>> GetAllAsync()
     {
-        return await Context.Set<T>().ToListAsync();
+        return await context.Set<T>().ToListAsync();
     }
 
     public async Task<T?> GetByIdAsync(int id)
     {
-        return await Context.Set<T>().FindAsync(id).AsTask();
+        return await context.Set<T>().FindAsync(id).AsTask();
     }
 
     public async Task UpdateAsync(T entity)
     {
-        Context.Set<T>().Update(entity);
-        await Context.SaveChangesAsync();
+        context.Set<T>().Update(entity);
     }
 }

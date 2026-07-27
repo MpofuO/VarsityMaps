@@ -7,5 +7,9 @@ public interface IUnitOfWork
     IBuildingRepository BuildingRepository { get; }
     INodeRepository NodeRepository { get; }
     IEdgeRepository EdgeRepository { get; }
-    Task<int> CompleteAsync();
+    IRouteRepository RouteRepository { get; }
+    ICheckpointRepository CheckpointRepository { get; }
+    IApplicationRepository ApplicationRepository { get; }
+    IInvitationRepository InvitationRepository { get; }
+    Task<bool> CompleteAsync();
 }
