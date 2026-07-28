@@ -12,12 +12,12 @@ public class UniversityRepository : BaseRepository<University>, IUniversityRepos
 
     public async Task<University?> GetByAliasAsync(string alias)
     {
-        return await Context.Universities.FirstOrDefaultAsync(u => u.Alias == alias);
+        return await context.Universities.FirstOrDefaultAsync(u => u.Alias == alias);
     }
 
     public async Task<University?> GetWithCampusesAsync(int id)
     {
-        return await Context.Universities
+        return await context.Universities
             .Include(u => u.Campuses)
             .FirstOrDefaultAsync(u => u.UniversityId == id);
     }
