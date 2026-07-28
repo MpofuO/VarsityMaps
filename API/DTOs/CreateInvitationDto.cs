@@ -4,8 +4,9 @@ namespace API.DTOs;
 
 public class CreateInvitationDto
 {
-    public string InviteeEmail { get; set; } = string.Empty;
-    public string InviteeName { get; set; } = string.Empty;
-    public int CampusId { get; set; }
-    public string Password { get; set; } = string.Empty;
+    public required string InviteeEmail { get; set; }
+    public required string InviteeName { get; set; }
+    public required int CampusId { get; set; }
+    public required int Duration { get; set; }
+    public required string Password { get; set; }
 }
