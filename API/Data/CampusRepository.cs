@@ -12,14 +12,14 @@ public class CampusRepository : BaseRepository<Campus>, ICampusRepository
 
     public async Task<IEnumerable<Campus>> GetByUniversityAsync(int universityId)
     {
-        return await Context.Campuses
+        return await context.Campuses
             .Where(c => c.UniversityId == universityId)
             .ToListAsync();
     }
 
     public async Task<Campus?> GetWithBuildingsAsync(int id)
     {
-        return await Context.Campuses
+        return await context.Campuses
             .Include(c => c.Buildings)
             .FirstOrDefaultAsync(c => c.CampusId == id);
     }

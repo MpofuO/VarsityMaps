@@ -3,7 +3,7 @@ namespace API.Entities;
 public class Edge
 {
     public int EdgeId { get; set; }
-    public double Weight { get; set; }
+    public decimal Weight { get; set; }
     public int CampusId { get; set; }
     
     public int FromNodeId { get; set; }

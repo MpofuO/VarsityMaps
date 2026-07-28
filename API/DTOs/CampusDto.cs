@@ -4,7 +4,9 @@ namespace API.DTOs;
 
 public class CampusDto
 {
-    public string Name { get; set; } = string.Empty;
-    public string Alias { get; set; } = string.Empty;
-    public Point Center { get; set; } = null!;
+    public int CampusId { get; set; }
+    public required string Name { get; set; }
+    public required string Alias { get; set; }
+    public required Point Center { get; set; }
+    public int UniversityId { get; set; }
 }

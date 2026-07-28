@@ -5,7 +5,8 @@ namespace API.Entities;
 public class Campus
 {
     public int CampusId { get; set; }
-    public string Name { get; set; } = string.Empty;
+    public required string Name { get; set; }
+    public required string Alias { get; set; }
     public required Point Center { get; set; }
 
     public int UniversityId { get; set; }

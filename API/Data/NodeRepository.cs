@@ -13,21 +13,21 @@ public class NodeRepository : BaseRepository<Node>, INodeRepository
 
     public async Task<IEnumerable<Node>> GetByBuildingAsync(int buildingId)
     {
-        return await Context.Nodes
+        return await context.Nodes
             .Where(n => n.BuildingId == buildingId)
             .ToListAsync();
     }
 
     public async Task<IEnumerable<Node>> GetByCampusAsync(int campusId)
     {
-        return await Context.Nodes
+        return await context.Nodes
             .Where(n => n.CampusId == campusId)
             .ToListAsync();
     }
 
     public async Task<Node?> GetNearestAsync(Point location, int campusId)
     {
-        return await Context.Nodes
+        return await context.Nodes
             .Where(n => n.CampusId == campusId)
             .OrderBy(n => Math.Abs(n.Location!.X - location.X) + Math.Abs(n.Location.Y - location.Y))
             .FirstOrDefaultAsync();
