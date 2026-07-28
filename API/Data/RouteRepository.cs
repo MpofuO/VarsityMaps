@@ -10,6 +10,12 @@ public class RouteRepository : BaseRepository<Route>, IRouteRepository
     {
     }
 
+    public async Task<Route?> GetByBuildingsAsync(int fromBuildingId, int toBuildingId)
+    {
+        return await context.Routes
+            .FirstOrDefaultAsync(r => r.FromBuildingId == fromBuildingId && r.ToBuildingId == toBuildingId);
+    }
+
     public async Task<Route?> GetByNodesAsync(int fromNodeId, int toNodeId)
     {
         return await context.Routes
@@ -19,13 +25,13 @@ public class RouteRepository : BaseRepository<Route>, IRouteRepository
     public async Task<Route?> GetWithCheckPointsAsync(int fromNodeId, int toNodeId)
     {
         return await context.Routes
-            .Include(r => r.Checkpoints)
+            .Include(r => r.CheckPoints)
             .FirstOrDefaultAsync(r => r.FromNodeId == fromNodeId && r.ToNodeId == toNodeId);
     }
     public async Task<Route?> GetWithCheckPointsAsync(int routeId)
     {
         return await context.Routes
-            .Include(r => r.Checkpoints)
+            .Include(r => r.CheckPoints)
             .FirstOrDefaultAsync(r => r.RouteId == routeId);
     }
 }

@@ -2,7 +2,7 @@ using NetTopologySuite.Geometries;
 
 namespace API.Entities;
 
-public class Checkpoint
+public class CheckPoint
 {
     public int Id { get; set; }
     public required Point Location { get; set; }

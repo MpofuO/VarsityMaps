@@ -6,6 +6,6 @@ namespace API.Interfaces;
 
 public interface IRouteService
 {
-    Route GetShortestPath(List<Edge> edges);
+    Route? GetShortestPath(IReadOnlyList<Edge> navigableEdges, IEnumerable<Node> fromEntrances, IEnumerable<Node> toEntrances);
     List<Tuple<Point, string>> GetRouteGuides(Route route);
 }
