@@ -4,18 +4,20 @@ using API.DTOs;
 using API.Entities;
 using API.Extensions;
 using API.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "RequireUniversityAdminRole")]
 public class InvitationController(IUnitOfWork uow, IMailService mailService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IEnumerable<InvitationDto>>> GetAll()
     {
-        var invitations = await uow.InvitationRepository.GetAllWithDetailsAsync();
+        var invitations = await uow.InvitationRepository.GetAllAsync();
         return Ok(invitations.Select(i => i.ToDto()));
     }
 
@@ -31,9 +33,11 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
     public async Task<ActionResult<InvitationDto>> Create(CreateInvitationDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
+        var invitationExists = (await uow.InvitationRepository.GetAllAsync())
+            .Any(i => i.CampusId == dto.CampusId && (i.IsAccepted || !i.IsRevoked));
+        if (invitationExists) return BadRequest("A pending or accepted invitation for this campus already exists.");
 
         var (pin, hash, salt) = GeneratePin();
-
         var invitation = new Invitation
         {
             InviteeEmail = dto.InviteeEmail,
@@ -64,6 +68,8 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         invitation.PasswordHash = hash;
         invitation.PasswordSalt = salt;
         invitation.FailedPassAttempts = 0;
+
+        Console.WriteLine($"Generated PIN: {pin} for {invitation.InviteeEmail}");
 
         await uow.InvitationRepository.UpdateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to reset PIN.");

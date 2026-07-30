@@ -8,5 +8,4 @@ public class CreateInvitationDto
     public required string InviteeName { get; set; }
     public required int CampusId { get; set; }
     public required int Duration { get; set; }
-    public required string Password { get; set; }
 }

@@ -11,9 +11,14 @@ public class MailService(IOptions<MailSettings> mailSettings) : IMailService
     private readonly MailSettings _settings = mailSettings.Value;
 
     public Task SendInvitationPinAsync(string toEmail, string toName, string pin) =>
-        SendAsync(toEmail, toName, "Your Varsity Maps Invitation PIN",
-            $"Hi {toName},\n\nYour Campus Admin invitation PIN is: {pin}\n\n" +
-            $"This PIN allows up to 3 attempts and expires with your invitation.");
+    SendAsync(toEmail, toName, "You've Been Invited to Varsity Maps",
+        $"Hi {toName},\n\n" +
+        $"You've been invited to join Varsity Maps as a Campus Admin.\n\n" +
+        $"Your PIN to accept this invitation is: {pin}\n" +
+        $"(Note: you have up to 3 attempts to enter it correctly.)\n\n" +
+        $"Click the link below to proceed:\n" +
+        $"{{invitationLink}}\n\n" +
+        $"If you weren't expecting this invitation, you can safely ignore this email.");
 
     public Task SendInvitationReminderAsync(string toEmail, string toName) =>
         SendAsync(toEmail, toName, "Reminder: Pending Varsity Maps Invitation",
@@ -29,7 +34,7 @@ public class MailService(IOptions<MailSettings> mailSettings) : IMailService
         message.Body = new TextPart("plain") { Text = body };
 
         using var client = new SmtpClient();
-        await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.StartTls);
+        await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.Auto);
         await client.AuthenticateAsync(_settings.Username, _settings.Password);
         await client.SendAsync(message);
         await client.DisconnectAsync(true);

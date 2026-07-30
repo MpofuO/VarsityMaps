@@ -1,5 +1,6 @@
 using API.Entities;
 using API.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Data;
 
@@ -11,6 +12,9 @@ public class InvitationRepository : BaseRepository<Invitation>, IInvitationRepos
 
     public Task<IEnumerable<Invitation>> GetAllWithDetailsAsync()
     {
-        throw new NotImplementedException();
+        return context.Invitations
+            .Include(i => i.Campus)
+            .ToListAsync()
+            .ContinueWith(t => (IEnumerable<Invitation>)t.Result);
     }
 }

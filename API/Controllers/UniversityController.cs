@@ -2,6 +2,7 @@ using API.DTOs;
 using API.Entities;
 using API.Extensions;
 using API.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,6 +10,7 @@ namespace API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "RequireSystemAdminRole")]
 public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
 {
 
@@ -32,6 +34,7 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
     }
 
     [HttpPost("applications")]
+    [AllowAnonymous]
     public async Task<ActionResult> Apply(ApplyDto applyDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
