@@ -12,10 +12,10 @@ namespace API.Controllers;
 // BuildingController.cs
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "RequireCampusAdminRole")]
 public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
 {
     [HttpGet("campus/{campusId:int}")]
+    [Authorize(Policy = "RequireCampusAdminOrStandardUserRole")]
     public async Task<ActionResult<IEnumerable<BuildingDto>>> GetBuildings()
     {
         var buildings = await uow.BuildingRepository.GetByCampusAsync(await User.GetCampusIdAsync(userManager));
@@ -23,14 +23,20 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Policy = "RequireCampusAdminOrStandardUserRole")]
     public async Task<ActionResult<BuildingDto>> GetBuilding(int id)
     {
-        var building = await uow.BuildingRepository.GetByIdAsync(id);
+        var building = await uow.BuildingRepository.GetWithEntrancesAsync(id);
         if (building is null) return NotFound();
+
+        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        if (building.CampusId != callerCampusId) return NotFound();
+
         return Ok(building.ToDto());
     }
 
     [HttpPost]
+    [Authorize(Policy = "RequireCampusAdminRole")]
     public async Task<ActionResult> AddBuilding(BuildingDto buildingDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -51,6 +57,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
     }
 
     [HttpPut("{buildingId:int}")]
+    [Authorize(Policy = "RequireCampusAdminRole")]
     public async Task<ActionResult> EditBuilding(int buildingId, BuildingDto buildingDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -58,11 +65,13 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         var building = await uow.BuildingRepository.GetByIdAsync(buildingId);
         if (building is null) return NotFound();
 
+        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        if (building.CampusId != callerCampusId) return NotFound();
+
         building.Name = buildingDto.Name;
         building.Alias = buildingDto.Alias;
         building.IsAccessible = buildingDto.IsAccessible;
         building.IsGuestAccessible = buildingDto.IsGuestAccessible;
-        building.Boundary = buildingDto.Boundary;
 
         await uow.BuildingRepository.UpdateAsync(building);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update building.");

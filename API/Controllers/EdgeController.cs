@@ -1,7 +1,10 @@
 using API.Entities;
+using API.Extensions;
+using API.Helpers;
 using API.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -10,7 +13,7 @@ namespace API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Policy = "RequireCampusAdminRole")]
-public class EdgeController(IUnitOfWork uow) : ControllerBase
+public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult> AddEdge(int fromNodeId, int toNodeId)
@@ -19,14 +22,19 @@ public class EdgeController(IUnitOfWork uow) : ControllerBase
 
         var fromNode = await uow.NodeRepository.GetByIdAsync(fromNodeId);
         var toNode = await uow.NodeRepository.GetByIdAsync(toNodeId);
-        if (fromNode is null || toNode is null) return BadRequest("One or both nodes not found.");
-        if (fromNode.CampusId != toNode.CampusId) return BadRequest("Nodes must belong to the same campus.");
+        var campusId = await User.GetCampusIdAsync(userManager);
+
+        if (fromNode is null || toNode is null || fromNode.CampusId != campusId || toNode.CampusId != campusId)
+            return BadRequest("One or both nodes not found.");
+
+        var degreeDistance = fromNode.Location.Distance(toNode.Location);
 
         var edge = new Edge
         {
             FromNodeId = fromNodeId,
             ToNodeId = toNodeId,
-            Weight = (decimal)fromNode.Location.Distance(toNode.Location)
+            Weight = (decimal)GeoHelper.DegreeDistanceToMeters(degreeDistance, toNode.Location.Y),
+            CampusId = campusId
         };
 
         await uow.EdgeRepository.CreateAsync(edge);

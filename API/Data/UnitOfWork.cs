@@ -1,4 +1,6 @@
+using API.Entities;
 using API.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Data;
 
@@ -32,6 +34,29 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task<bool> CompleteAsync()
     {
-        return await _context.SaveChangesAsync() > 0;
+        var edgeCampusIds = _context.ChangeTracker
+            .Entries<Edge>()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Deleted)
+            .Select(e => e.Entity.CampusId);
+
+        var buildingCampusIds = _context.ChangeTracker
+            .Entries<Building>()
+            .Where(e => e.State == EntityState.Modified &&
+                        (e.Property(b => b.IsAccessible).IsModified ||
+                         e.Property(b => b.IsGuestAccessible).IsModified))
+            .Select(e => e.Entity.CampusId);
+
+        var affectedCampusIds = edgeCampusIds.Union(buildingCampusIds).ToList();
+
+        var result = await _context.SaveChangesAsync();
+
+        if (result > 0 && affectedCampusIds.Count > 0)
+        {
+            await _context.Routes
+                .Where(r => affectedCampusIds.Contains(r.CampusId))
+                .ExecuteDeleteAsync();
+        }
+
+        return result > 0;
     }
 }

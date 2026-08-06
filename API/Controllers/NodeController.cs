@@ -5,6 +5,7 @@ using API.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using API.Helpers;
 
 namespace API.Controllers;
 
@@ -13,22 +14,89 @@ namespace API.Controllers;
 [Authorize(Policy = "RequireCampusAdminRole")]
 public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
 {
-    [HttpPost]
-    public async Task<ActionResult<int>> AddNode(NodeDto nodeDto)
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<NodeDto>>> GetNodes()
+    {
+        var nodes = await uow.NodeRepository.GetByCampusAsync(await User.GetCampusIdAsync(userManager));
+        return Ok(nodes.Select(n => n.ToDto()).ToList());
+    }
+
+    [HttpPost("{buildingId:int}")]
+    public async Task<ActionResult<NodeDto>> AddEntranceNode(int buildingId, NodeDto nodeDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var callerCampusId = await User.GetCampusIdAsync(userManager);
+
+        var building = await uow.BuildingRepository.GetByIdAsync(buildingId);
+        if (building is null) return NotFound("Building not found.");
+        if (building.CampusId != callerCampusId) return NotFound("Building not found.");
+
+        if (building.Boundary.Contains(nodeDto.Location))
+            return BadRequest("Entrance node cannot be placed inside the building.");
+
+        var distance = building.Boundary.Distance(nodeDto.Location);
+        var distanceMeters = GeoHelper.DegreeDistanceToMeters(distance, nodeDto.Location.Y);
+        if (distanceMeters > 5)
+            return BadRequest($"Entrance node must be within 5 meters of the building boundary (currently {distanceMeters:F1}m away).");
 
         var node = new Node
         {
             Name = nodeDto.Name,
             Location = nodeDto.Location,
-            CampusId = await User.GetCampusIdAsync(userManager),
-            BuildingId = nodeDto.BuildingId
+            CampusId = callerCampusId,
+            BuildingId = buildingId
         };
 
         await uow.NodeRepository.CreateAsync(node);
-        if (!await uow.CompleteAsync()) return BadRequest("Failed to add node.");
-        return Ok(node.NodeId);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to add entrance node.");
+        return Ok(node.ToDto());
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<IReadOnlyList<NodeDto>>> AddNodes(AddNodeDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        if (dto.Nodes.Count < 2) return BadRequest("At least two nodes are required.");
+
+        var campusId = await User.GetCampusIdAsync(userManager);
+        var resolvedNodes = new List<Node>();
+
+        foreach (var item in dto.Nodes)
+        {
+            if (item.ExistingNodeId is int existingId)
+            {
+                var existing = await uow.NodeRepository.GetByIdAsync(existingId);
+                if (existing is null) return BadRequest($"Node {existingId} not found.");
+                if (existing.CampusId != campusId) return BadRequest($"Node {existingId} does not belong to your campus.");
+                resolvedNodes.Add(existing);
+            }
+            else
+            {
+                if (item.Location is null || string.IsNullOrWhiteSpace(item.Name))
+                    return BadRequest("New path nodes require both a name and a location.");
+
+                var newNode = new Node { Name = item.Name, Location = item.Location, CampusId = campusId };
+                await uow.NodeRepository.CreateAsync(newNode);
+                resolvedNodes.Add(newNode);
+            }
+        }
+
+        for (var i = 0; i < resolvedNodes.Count - 1; i++)
+        {
+            double degreeDistance = resolvedNodes[i].Location.Distance(resolvedNodes[i + 1].Location);
+            var edge = new Edge
+            {
+                FromNode = resolvedNodes[i],
+                ToNode = resolvedNodes[i + 1],
+                Weight = (decimal)GeoHelper.DegreeDistanceToMeters(degreeDistance, resolvedNodes[i + 1].Location.Y)
+            };
+            await uow.EdgeRepository.CreateAsync(edge);
+        }
+
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to add nodes.");
+
+        return Ok(resolvedNodes.Select(n => n.ToDto()).ToList());
     }
 
     [HttpDelete("{nodeId:int}")]
@@ -36,6 +104,9 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     {
         var node = await uow.NodeRepository.GetByIdAsync(nodeId);
         if (node is null) return NotFound();
+
+        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        if (node.CampusId != callerCampusId) return NotFound();
 
         var edges = await uow.EdgeRepository.GetByNodeAsync(nodeId);
         foreach (var edge in edges)

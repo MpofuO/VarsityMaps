@@ -345,6 +345,9 @@ namespace API.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RouteId"));
 
+                    b.Property<int>("CampusId")
+                        .HasColumnType("int");
+
                     b.Property<int>("FromBuildingId")
                         .HasColumnType("int");
 

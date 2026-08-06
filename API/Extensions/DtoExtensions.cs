@@ -59,4 +59,15 @@ public static class DtoExtensions
             Boundary = building.Boundary
         };
     }
+
+    public static NodeDto ToDto(this Node node)
+    {
+        return new NodeDto
+        {
+            NodeId = node.NodeId,
+            Name = node.Name!,
+            Location = node.Location,
+            BuildingId = node.BuildingId
+        };
+    }
 }

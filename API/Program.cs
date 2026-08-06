@@ -57,7 +57,8 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("RequireSystemAdminRole", policy => policy.RequireRole("SystemAdmin"))
     .AddPolicy("RequireUniversityAdminRole", policy => policy.RequireRole("UniversityAdmin"))
     .AddPolicy("RequireCampusAdminRole", policy => policy.RequireRole("CampusAdmin"))
-    .AddPolicy("RequireStandardUserRole", policy => policy.RequireRole("StandardUser"));
+    .AddPolicy("RequireStandardUserRole", policy => policy.RequireRole("StandardUser"))
+    .AddPolicy("RequireCampusAdminOrStandardUserRole", policy => policy.RequireRole("CampusAdmin", "StandardUser"));;
 
 var app = builder.Build();
 
