@@ -1,0 +1,34 @@
+<div [class]="containerClass()">
+  @if (label()) {
+    <label [class]="labelClass()">
+      <span [class]="labelTextClass()">{{ label() }}</span>
+    </label>
+  }
+
+  <div class="relative">
+    <input
+      [class]="inputClass()"
+      [class.input-error]="shouldShowError"
+      [class.input-success]="control.valid && control.touched"
+      [type]="type()"
+      [placeholder]="placeholder()"
+      [attr.autocomplete]="autocomplete()"
+      [attr.id]="id()"
+      [attr.name]="name()"
+      [attr.min]="min()"
+      [attr.max]="max()"
+      [attr.step]="step()"
+      [value]="value"
+      [disabled]="disabled"
+      (input)="onInput($event)"
+      (blur)="onBlur()"
+    />
+    <ng-content></ng-content>
+  </div>
+
+  @if (shouldShowError && errorMessage) {
+    <div class="label pt-1">
+      <span [class]="errorClass()">{{ errorMessage }}</span>
+    </div>
+  }
+</div>

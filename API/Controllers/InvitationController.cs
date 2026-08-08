@@ -22,9 +22,10 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
     }
 
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     public async Task<ActionResult<InvitationDto>> Get(int id)
     {
-        var invitation = await uow.InvitationRepository.GetByIdAsync(id);
+        var invitation = await uow.InvitationRepository.GetAllWithDetailsAsync(id);
         if (invitation is null) return NotFound();
         return Ok(invitation.ToDto());
     }
@@ -52,7 +53,9 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         await uow.InvitationRepository.CreateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to create invitation.");
 
-        await mailService.SendInvitationPinAsync(invitation.InviteeEmail, invitation.InviteeName, pin);
+        await mailService.SendInvitationPinAsync(
+                invitation.InviteeEmail, invitation.InviteeName,
+                pin, invitation.InvitationId);
         return Ok(invitation.ToDto());
     }
 
@@ -74,7 +77,9 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         await uow.InvitationRepository.UpdateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to reset PIN.");
 
-        await mailService.SendInvitationPinAsync(invitation.InviteeEmail, invitation.InviteeName, pin);
+        await mailService.SendInvitationPinAsync(
+                invitation.InviteeEmail, invitation.InviteeName,
+                pin, invitation.InvitationId);
         return Ok(invitation.ToDto());
     }
 
@@ -91,7 +96,10 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         await uow.InvitationRepository.UpdateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to resend invitation.");
 
-        await mailService.SendInvitationReminderAsync(invitation.InviteeEmail, invitation.InviteeName);
+        await mailService.SendInvitationReminderAsync(
+            invitation.InviteeEmail,
+            invitation.InviteeName,
+            invitation.InvitationId);
         return Ok(invitation.ToDto());
     }
 

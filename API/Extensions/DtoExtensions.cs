@@ -70,4 +70,14 @@ public static class DtoExtensions
             BuildingId = node.BuildingId
         };
     }
+
+    public static UniversityDto ToDto(this University university)
+    {
+        return new UniversityDto
+        {
+            UniversityId = university.UniversityId,
+            Name = university.Name,
+            Alias = university.Alias
+        };
+    }
 }

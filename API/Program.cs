@@ -67,7 +67,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors(policy => policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
+app.UseCors(policy => policy
+.AllowAnyHeader()
+.AllowAnyMethod()
+.AllowCredentials()
+.WithOrigins("http://localhost:4200", "https://localhost:4200"));
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -95,7 +100,8 @@ try
 {
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
     var userManager = services.GetRequiredService<UserManager<AppUser>>();
-    await SeedData.SeedAsync(roleManager, userManager);
+    var context = services.GetRequiredService<AppDbContext>();
+    await SeedData.SeedAsync(context, roleManager, userManager);
 }
 catch (Exception ex)
 {

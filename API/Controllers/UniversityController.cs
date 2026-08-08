@@ -13,6 +13,23 @@ namespace API.Controllers;
 [Authorize(Policy = "RequireSystemAdminRole")]
 public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
 {
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<ActionResult<IEnumerable<UniversityDto>>> GetUniversities()
+    {
+        var universities = await uow.UniversityRepository.GetAllAsync();
+        return Ok(universities.OrderBy(u => u.Name).Select(u => u.ToDto()));
+    }
+
+    [HttpGet("{universityId:int}/campuses")]
+    [AllowAnonymous]
+    public async Task<ActionResult<UniversityDto>> GetCampuses(int universityId)
+    {
+        var campuses = await uow.CampusRepository.GetByUniversityAsync(universityId);
+        if (campuses is null || !campuses.Any())
+            return NotFound("No campuses found for the specified university.");
+        return Ok(campuses.OrderBy(c=>c.Name).Select(c => c.ToDto()));
+    }
 
     [HttpGet("applications")]
     public async Task<ActionResult<IEnumerable<ApplicationDto>>> GetApplications()

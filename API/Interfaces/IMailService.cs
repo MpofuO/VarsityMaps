@@ -4,6 +4,6 @@ namespace API.Interfaces;
 
 public interface IMailService
 {
-    Task SendInvitationPinAsync(string toEmail, string toName, string pin);
-    Task SendInvitationReminderAsync(string toEmail, string toName);
+    Task SendInvitationPinAsync(string toEmail, string toName, string pin, int invitationId);
+    Task SendInvitationReminderAsync(string toEmail, string toName, int invitationId);
 }

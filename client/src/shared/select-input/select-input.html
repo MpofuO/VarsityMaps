@@ -1,0 +1,32 @@
+<div [class]="containerClass()">
+  @if (label()) {
+    <label [class]="labelClass()">
+      <span [class]="labelTextClass()">{{ label() }}</span>
+    </label>
+  }
+
+  <div class="relative">
+    <select
+      [class]="selectClass()"
+      [class.select-error]="shouldShowError"
+      [class.select-success]="control.valid && control.touched"
+      [value]="value"
+      [disabled]="disabled"
+      (change)="onChangeHandler($event)"
+      (blur)="onBlur()"
+    >
+      <option value="" disabled selected>
+        {{ disabled ? disabledPlaceholder() : placeholder() }}
+      </option>
+      @for (opt of options(); track opt.value) {
+        <option [value]="opt.value">{{ opt.label }}</option>
+      }
+    </select>
+  </div>
+
+  @if (shouldShowError && errorMessage) {
+    <div class="label pt-1">
+      <span [class]="errorClass()">{{ errorMessage }}</span>
+    </div>
+  }
+</div>

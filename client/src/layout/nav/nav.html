@@ -1,0 +1,74 @@
+<div class="navbar container mx-auto px-4 py-2">
+  <div class="flex-1">
+    <a class="btn btn-ghost text-2xl normal-case gap-2 font-bold hover:bg-base-200/60" routerLink="/">
+      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-content shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 24 24">
+          <path
+            d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+        </svg>
+      </div>
+      <span class="tracking-tight">Varsity<span class="text-primary">Maps</span></span>
+    </a>
+    @if(busyService.busyCount()>0) {
+    <span class="loading loading-spinner"></span>
+    }
+  </div>
+
+  <div class="flex gap-3">
+    <button class="btn btn-ghost btn-circle btn-sm text-base-content" type="button" (click)="themeService.toggleTheme()"
+      [attr.aria-label]="'Switch theme'">
+      @if (themeService.currentTheme() === 'dark') {
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current text-warning" viewBox="0 0 24 24">
+        <path
+          d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z" />
+      </svg>
+      } @else {
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+        class="size-6">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+      </svg>
+
+      }
+    </button>
+
+    @if (!accountService.currentUser()) {
+    <div class="flex items-center gap-2">
+      <a class="btn btn-ghost btn-sm font-medium" routerLink="/login">Login</a>
+      <a class="btn btn-primary btn-sm shadow-sm" routerLink="/register-standard-user">Get Started</a>
+    </div>
+    } @else {
+    <div class="dropdown dropdown-end">
+      <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-2">
+        <div class="avatar placeholder">
+          <div
+            class="bg-neutral text-neutral-content rounded-full w-6 h-6 text-xs flex items-center justify-center font-bold">
+            {{ (accountService.currentUser()?.email || 'U').charAt(0).toUpperCase() }}
+          </div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current opacity-60" viewBox="0 0 20 20">
+          <path fill-rule="evenodd"
+            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </div>
+      <ul tabindex="0"
+        class="menu dropdown-content z-50 mt-2 w-56 rounded-box bg-base-100 p-2 shadow-lg border border-base-200 text-sm">
+        <li class="menu-title px-3 py-1 text-xs text-base-content/50">Signed in as</li>
+        <li class="px-3 pb-2 pt-0 font-medium truncate text-xs border-b border-base-200">
+          {{ accountService.currentUser()?.email }}
+        </li>
+        <li class="mt-2">
+          <button class="text-error hover:bg-error/10" (click)="logout()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current" viewBox="0 0 24 24">
+              <path
+                d="M16 17v-3H9v-4h7V7l5 5-5 5M14 2a2 2 0 0 1 2 2v2h-2V4H5v16h9v-2h2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9z" />
+            </svg>
+            Logout
+          </button>
+        </li>
+      </ul>
+    </div>
+    }
+  </div>
+</div>

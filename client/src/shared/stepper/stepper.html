@@ -1,0 +1,14 @@
+<ul class="steps steps-vertical sm:steps-horizontal w-full my-4 [--step-neutral-bg:var(--colors-base-300)] [--step-neutral-content:var(colors.base-content/60)]">
+  @for (step of steps; track step; let index = $index) {
+    <li 
+      class="step text-xs sm:text-sm font-medium transition-colors duration-500" 
+      [class.step-primary]="index <= currentStep"
+      [attr.data-content]="index < currentStep ? '✓' : index + 1"
+    >
+      <span class="mt-1 sm:mt-0" [class.text-base-content]="index <= currentStep" 
+        [class.text-base-content/50]="index > currentStep">
+        {{ step }}
+      </span>
+    </li>
+  }
+</ul>
