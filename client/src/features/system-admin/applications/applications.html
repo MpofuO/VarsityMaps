@@ -1,0 +1,83 @@
+<section class="container mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">University applications</h1>
+
+  <div class="tabs tabs-boxed w-fit mb-6">
+    <a class="tab {{filter() === 'pending'? 'tab-active font-bold' : ''}}" (click)="filter.set('pending')">Pending</a>
+    <a class="tab {{filter() === 'approved'? 'tab-active font-bold' : ''}}" (click)="filter.set('approved')">Approved</a>
+    <a class="tab {{filter() === 'rejected'? 'tab-active font-bold' : ''}}" (click)="filter.set('rejected')">Rejected</a>
+    <a class="tab {{filter() === 'all'? 'tab-active font-bold' : ''}}" (click)="filter.set('all')">All</a>
+  </div>
+
+  <div class="overflow-x-auto rounded-box border border-base-300">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>University</th>
+          <th>Alias</th>
+          <th>Campuses</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (application of filteredApplications(); track application.applicationId) {
+          <tr>
+            <td class="font-medium">{{ application.universityName }}</td>
+            <td><span class="badge badge-ghost">{{ application.universityAlias }}</span></td>
+            <td>{{ application.campusCount }}</td>
+            <td>{{ application.dateCreated | date:'mediumDate' }}</td>
+            <td>
+              @if (application.isApproved === null) {
+                <span class="badge badge-warning">Pending</span>
+              } @else if (application.isApproved) {
+                <span class="badge badge-success">Approved</span>
+              } @else {
+                <span class="badge badge-error">Rejected</span>
+              }
+            </td>
+            <td class="text-right">
+              @if (application.isApproved === null) {
+                <div class="join">
+                  <button class="btn btn-sm btn-success text-success-content join-item" (click)="approve(application)">Approve</button>
+                  <button class="btn btn-sm btn-error text-error-content join-item" (click)="openReject(application)">Reject</button>
+                </div>
+              } @else if (application.decisionReason) {
+                <span class="text-xs text-base-content/60">"{{ application.decisionReason }}"</span>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="text-center py-6 text-base-content/60">No applications in this view.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<app-modal [isOpen]="isRejectOpen()" title="Reject application" (closed)="closeReject()">
+  @if (targetApplication(); as application) {
+    <div class="space-y-4">
+      <p class="text-sm">Reject the application from <span class="font-semibold">{{ application.universityName }}</span>?</p>
+
+      <div class="form-control">
+        <label class="label pb-1 me-1"><span class="label-text font-medium text-xs">Reason: </span></label>
+        <textarea
+          class="textarea textarea-bordered h-24 focus:textarea-primary w-100"
+          placeholder="Explain why this application is being rejected"
+          [value]="rejectionReason()"
+          (input)="rejectionReason.set($any($event.target).value)"
+        ></textarea>
+      </div>
+
+      <div class="modal-action">
+        <button class="btn btn-ghost" type="button" (click)="closeReject()">Cancel</button>
+        <button class="btn btn-error text-error-content" type="button" [disabled]="!rejectionReason().trim()" (click)="confirmReject()">
+          Confirm rejection
+        </button>
+      </div>
+    </div>
+  }
+</app-modal>

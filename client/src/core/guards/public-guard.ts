@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AccountService } from '../services/account-service';
-import { roleHomeRoute } from '../role-home';
+import { roleHomeRoute } from '../functions/role-home';
 
 export const publicGuard: CanActivateFn = () => {
   const accountService = inject(AccountService);

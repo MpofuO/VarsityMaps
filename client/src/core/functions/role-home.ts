@@ -1,4 +1,4 @@
-import { CampusAdminRole, StandardUserRole, SystemAdminRole, UniversityAdminRole } from './services/account-service';
+import { CampusAdminRole, StandardUserRole, SystemAdminRole, UniversityAdminRole } from '../services/account-service';
 
 export const RoleHomeRoutes: Record<string, string> = {
   [SystemAdminRole]: '/system-admin',

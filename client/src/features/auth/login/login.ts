@@ -3,7 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AccountService } from '../../../core/services/account-service';
 import { ToastService } from '../../../core/services/toast-service';
-import { roleHomeRoute } from '../../../core/role-home';
+import { roleHomeRoute } from '../../../core/functions/role-home';
 import { TextInput } from '../../../shared/text-input/text-input';
 import { LoginModel } from '../../../types/auth';
 

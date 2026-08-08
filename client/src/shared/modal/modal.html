@@ -1,0 +1,10 @@
+<dialog class="modal" [class.modal-open]="isOpen()">
+  <div class="modal-box relative">
+    <button type="button" class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="onClose()">✕</button>
+    @if (title()) {
+      <h3 class="font-bold text-lg mb-4">{{ title() }}</h3>
+    }
+    <ng-content></ng-content>
+  </div>
+  <div class="modal-backdrop" (click)="onClose()"></div>
+</dialog>

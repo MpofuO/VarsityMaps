@@ -1,5 +1,5 @@
 <div class="navbar container mx-auto px-4 py-2">
-  <div class="flex-1">
+  <div class="flex-1 flex items-center gap-1">
     <a class="btn btn-ghost text-2xl normal-case gap-2 font-bold hover:bg-base-200/60" routerLink="/">
       <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-content shadow-sm">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 24 24">
@@ -9,11 +9,24 @@
       </div>
       <span class="tracking-tight">Varsity<span class="text-primary">Maps</span></span>
     </a>
+
+    @if (navLinks().length > 0) {
+    <div class="border-primary border-l-2 h-6 mx-1"></div>
+    <ul class="menu menu-horizontal uppercase px-1 gap-4">
+      @for (link of navLinks(); track link.path) {
+      <li>
+        <a [routerLink]="link.path" class="p-0" routerLinkActive="text-primary border-b font-semibold">
+          {{ link.label }}
+        </a>
+      </li>
+      }
+    </ul>
+    }
+
     @if(busyService.busyCount()>0) {
-    <span class="loading loading-spinner"></span>
+    <span class="mr-2 loading loading-spinner"></span>
     }
   </div>
-
   <div class="flex gap-3">
     <button class="btn btn-ghost btn-circle btn-sm text-base-content" type="button" (click)="themeService.toggleTheme()"
       [attr.aria-label]="'Switch theme'">

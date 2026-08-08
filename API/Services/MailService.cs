@@ -8,13 +8,13 @@ namespace API.Services;
 
 public class MailService(IOptions<MailSettings> mailSettings) : IMailService
 {
-    private readonly MailSettings _settings = mailSettings.Value;
+  private readonly MailSettings _settings = mailSettings.Value;
 
-    public Task SendInvitationPinAsync(string toEmail, string toName, string pin, int invitationId)
-    {
-        var acceptLink = $"{_settings.ClientUrl.TrimEnd('/')}/accept-invitation/{invitationId}";
+  public Task SendInvitationPinAsync(string toEmail, string toName, string pin, int invitationId)
+  {
+    var acceptLink = $"{_settings.ClientUrl.TrimEnd('/')}/accept-invitation/{invitationId}";
 
-        var bodyContent = $@"
+    var bodyContent = $@"
             <p style=""margin: 0 0 16px; color: #475569; font-size: 15px; line-height: 1.6;"">
                 Hi <strong>{toName}</strong>,
             </p>
@@ -26,23 +26,23 @@ public class MailService(IOptions<MailSettings> mailSettings) : IMailService
             </p>
         ";
 
-        return SendGenericEmailAsync(
-            toEmail, 
-            toName, 
-            "You've Been Invited to VarsityMaps", 
-            "VarsityMaps Invitation",
-            bodyContent, 
-            highlightCode: pin, 
-            actionUrl: acceptLink, 
-            actionText: "Accept Invitation"
-        );
-    }
+    return SendGenericEmailAsync(
+        toEmail,
+        toName,
+        "You've Been Invited to VarsityMaps",
+        "VarsityMaps Invitation",
+        bodyContent,
+        highlightCode: pin,
+        actionUrl: acceptLink,
+        actionText: "Accept Invitation"
+    );
+  }
 
-    public Task SendInvitationReminderAsync(string toEmail, string toName, int invitationId)
-    {
-        var acceptLink = $"{_settings.ClientUrl.TrimEnd('/')}/accept-invitation/{invitationId}";
+  public Task SendInvitationReminderAsync(string toEmail, string toName, int invitationId)
+  {
+    var acceptLink = $"{_settings.ClientUrl.TrimEnd('/')}/accept-invitation/{invitationId}";
 
-        var bodyContent = $@"
+    var bodyContent = $@"
             <p style=""margin: 0 0 16px; color: #475569; font-size: 15px; line-height: 1.6;"">
                 Hi <strong>{toName}</strong>,
             </p>
@@ -54,28 +54,56 @@ public class MailService(IOptions<MailSettings> mailSettings) : IMailService
             </p>
         ";
 
-        return SendGenericEmailAsync(
-            toEmail, 
-            toName, 
-            "Reminder: Pending VarsityMaps Invitation", 
-            "Invitation Reminder",
-            bodyContent, 
-            actionUrl: acceptLink, 
-            actionText: "Go to Acceptance Page"
-        );
-    }
+    return SendGenericEmailAsync(
+        toEmail,
+        toName,
+        "Reminder: Pending VarsityMaps Invitation",
+        "Invitation Reminder",
+        bodyContent,
+        actionUrl: acceptLink,
+        actionText: "Go to Acceptance Page"
+    );
+  }
 
-    private async Task SendGenericEmailAsync(
-        string toEmail, 
-        string toName, 
-        string subject, 
-        string preheader,
-        string bodyHtml, 
-        string? highlightCode = null, 
-        string? actionUrl = null, 
-        string? actionText = null)
-    {
-        var htmlTemplate = $@"
+  public Task SendApplicationApprovedAsync(string toEmail, string universityName)
+  {
+    var loginLink = $"{_settings.ClientUrl.TrimEnd('/')}/login";
+
+    var bodyContent = $@"
+        <p style=""margin: 0 0 16px; color: #475569; font-size: 15px; line-height: 1.6;"">
+            Congratulations!
+        </p>
+        <p style=""margin: 0 0 20px; color: #475569; font-size: 15px; line-height: 1.6;"">
+            <strong>{universityName}</strong>'s application to join <strong>VarsityMaps</strong> has been approved.
+            Your university admin account is now active.
+        </p>
+        <p style=""margin: 0 0 12px; color: #475569; font-size: 14px;"">
+            You can sign in now to start setting up your campuses.
+        </p>
+    ";
+
+    return SendGenericEmailAsync(
+        toEmail,
+        universityName,
+        "Your Institution Has Been Approved",
+        "VarsityMaps Approval",
+        bodyContent,
+        actionUrl: loginLink,
+        actionText: "Sign In"
+    );
+  }
+
+  private async Task SendGenericEmailAsync(
+      string toEmail,
+      string toName,
+      string subject,
+      string preheader,
+      string bodyHtml,
+      string? highlightCode = null,
+      string? actionUrl = null,
+      string? actionText = null)
+  {
+    var htmlTemplate = $@"
         <!DOCTYPE html>
         <html lang=""en"">
         <head>
@@ -140,28 +168,28 @@ public class MailService(IOptions<MailSettings> mailSettings) : IMailService
         </body>
         </html>";
 
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
-        message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = subject;
+    var message = new MimeMessage();
+    message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
+    message.To.Add(new MailboxAddress(toName, toEmail));
+    message.Subject = subject;
 
-        var builder = new BodyBuilder { HtmlBody = htmlTemplate };
-        message.Body = builder.ToMessageBody();
+    var builder = new BodyBuilder { HtmlBody = htmlTemplate };
+    message.Body = builder.ToMessageBody();
 
-        using var client = new SmtpClient();
-        await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.Auto);
-        await client.AuthenticateAsync(_settings.Username, _settings.Password);
-        await client.SendAsync(message);
-        await client.DisconnectAsync(true);
-    }
+    using var client = new SmtpClient();
+    await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.Auto);
+    await client.AuthenticateAsync(_settings.Username, _settings.Password);
+    await client.SendAsync(message);
+    await client.DisconnectAsync(true);
+  }
 }
 public class MailSettings
 {
-    public string Host { get; set; } = "";
-    public int Port { get; set; }
-    public string SenderEmail { get; set; } = "";
-    public string SenderName { get; set; } = "";
-    public string Username { get; set; } = "";
-    public string Password { get; set; } = "";
-    public string ClientUrl { get; set; } = "";
+  public string Host { get; set; } = "";
+  public int Port { get; set; }
+  public string SenderEmail { get; set; } = "";
+  public string SenderName { get; set; } = "";
+  public string Username { get; set; } = "";
+  public string Password { get; set; } = "";
+  public string ClientUrl { get; set; } = "";
 }

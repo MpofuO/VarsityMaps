@@ -11,7 +11,7 @@ namespace API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Policy = "RequireSystemAdminRole")]
-public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
+public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork uow, IMailService mailService) : ControllerBase
 {
     [HttpGet]
     [AllowAnonymous]
@@ -28,7 +28,7 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
         var campuses = await uow.CampusRepository.GetByUniversityAsync(universityId);
         if (campuses is null || !campuses.Any())
             return NotFound("No campuses found for the specified university.");
-        return Ok(campuses.OrderBy(c=>c.Name).Select(c => c.ToDto()));
+        return Ok(campuses.OrderBy(c => c.Name).Select(c => c.ToDto()));
     }
 
     [HttpGet("applications")]
@@ -125,6 +125,11 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
 
         var roleResult = await userManager.AddToRoleAsync(user, "UniversityAdmin");
         if (!roleResult.Succeeded) return BadRequest(roleResult.Errors);
+        
+        try
+        {
+            await mailService.SendApplicationApprovedAsync(user.Email!, university.Name);
+        }catch { }
 
         return Ok();
     }

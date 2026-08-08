@@ -1,0 +1,72 @@
+<section class="container mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">Universities</h1>
+
+  <div class="overflow-x-auto rounded-box border border-base-300">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Alias</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (university of universities(); track university.universityId) {
+        <tr>
+          <td class="font-medium">{{ university.name }}</td>
+          <td><span class="badge badge-ghost">{{ university.alias }}</span></td>
+          <td class="text-right">
+            <button class="btn btn-sm btn-outline btn-primary" (click)="openDetail(university)">View details</button>
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="3" class="text-center py-6 text-base-content/60">No universities yet.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<app-modal [isOpen]="isDetailOpen()" title="University details" (closed)="closeDetail()">
+  @if (selectedUniversity(); as university) {
+  <div class="space-y-4">
+    <div>
+      <div class="text-xs text-base-content/60">Name</div>
+      <div class="text-lg font-semibold">{{ university.name }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-base-content/60">Alias</div>
+      <span class="badge badge-secondary">{{ university.alias }}</span>
+    </div>
+    <div>
+      <div class="text-xs text-base-content/60 mb-2">Campuses</div>
+      @if (campuses(); as list) {
+        @if (list.length > 0) {
+          <ul class="space-y-1.5">
+            @for (campus of list; track campus.campusId) {
+            <li class="flex items-center justify-between bg-base-200/60 rounded-btn px-3 py-1.5">
+              <span class="text-sm font-medium">{{ campus.name }}</span>
+              <span class="badge badge-ghost badge-sm">{{ campus.alias }}</span>
+            </li>
+            }
+          </ul>
+        } @else {
+          <div class="text-sm text-base-content/60">No campuses added yet.</div>
+        }
+      } @else {
+        <span class="loading loading-spinner loading-xs"></span>
+      }
+    </div>
+    
+    <div class="text-xs text-base-content/60 mb-2 mt-3">Admin Details</div>
+    <div class="alert alert-info text-xs">
+      <span>Admin contact details aren't available yet for this institution.</span>
+    </div>
+    <div class="modal-action">
+      <button class="btn" type="button" (click)="closeDetail()">Close</button>
+    </div>
+  </div>
+  }
+</app-modal>

@@ -15,7 +15,7 @@ public static class DtoExtensions
             UniversityAlias = application.UniversityAlias,
             CampusCount = application.CampusCount,
             DateCreated = application.DateCreated,
-            IsApproved = application.IsApproved,
+            IsApproved = application.IsApproved.HasValue ? application.IsApproved.Value : null,
             DecisionReason = application.DecisionReason
         };
     }
