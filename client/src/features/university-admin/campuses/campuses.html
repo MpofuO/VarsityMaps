@@ -1,0 +1,68 @@
+<section class="container mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">Campuses</h1>
+        <button class="btn btn-primary btn-sm" (click)="openCreate()">Add campus</button>
+    </div>
+
+    <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Alias</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (campus of campuses(); track campus.campusId) {
+                <tr>
+                    <td class="font-medium">{{ campus.name }}</td>
+                    <td><span class="badge badge-ghost">{{ campus.alias }}</span></td>
+                    <td class="text-right">
+                        <button class="btn btn-sm btn-outline btn-primary" (click)="openEdit(campus)">Edit</button>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="3" class="text-center py-6 text-base-content/60">No campuses yet.</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<app-modal [isOpen]="isFormOpen()" [title]="editingCampus() ? 'Edit campus' : 'Add campus'" (closed)="closeForm()">
+    <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+        <app-text-input label="Campus name:" formControlName="name" [hasIcon]="false" />
+        <app-text-input label="Alias:" formControlName="alias" [hasIcon]="false" />
+
+        <div class="mt-4">
+            <span class="text-xs">Location:</span>
+            <div class="grid grid-cols-2 gap-3">
+                <app-text-input label="Latitude" type="number" step="any" formControlName="latitude"
+                    [hasIcon]="false" />
+                <app-text-input label="Longitude" type="number" step="any" formControlName="longitude"
+                    [hasIcon]="false" />
+            </div>
+            <button type="button" class="btn btn-xs btn-success" (click)="openPicker()">Pick on map</button>
+        </div>
+
+        @if (editingCampus()) {
+        <div>
+            <div class="text-xs text-base-content/60 mb-1">Campus admin</div>
+            <span class="badge badge-ghost">Unassigned</span>
+        </div>
+        }
+
+        <div class="modal-action">
+            <button type="button" class="btn btn-ghost" (click)="closeForm()">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="form.invalid">
+                {{ editingCampus() ? 'Save changes' : 'Create campus' }}
+            </button>
+        </div>
+    </form>
+</app-modal>
+
+<app-coordinate-picker [isOpen]="isPickerOpen()" [initialLatitude]="form.controls.latitude.value"
+    [initialLongitude]="form.controls.longitude.value" (picked)="onLocationPicked($event)" (closed)="closePicker()" />

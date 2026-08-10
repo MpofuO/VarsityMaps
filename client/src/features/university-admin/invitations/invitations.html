@@ -1,0 +1,103 @@
+<section class="container mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Campus admin invitations</h1>
+    <button class="btn btn-primary btn-sm" (click)="openCreate()">New invitation</button>
+  </div>
+
+  <div class="overflow-x-auto rounded-box border border-base-300">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Campus</th>
+          <th>Invitee</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (invitation of invitations(); track invitation.invitationId) {
+          <tr>
+            <td class="font-medium">{{ invitation.campusName }}</td>
+            <td>
+              <div class="text-sm">{{ invitation.inviteeName }}</div>
+              <div class="text-xs text-base-content/60">{{ invitation.inviteeEmail }}</div>
+            </td>
+            <td>
+              @if (invitation.isAccepted) {
+                <span class="badge badge-success">Accepted</span>
+              } @else if (invitation.isRevoked) {
+                <span class="badge badge-primary">Revoked</span>
+              } @else if (invitation.isLocked) {
+                <span class="badge badge-error">Locked</span>
+              } @else if (invitation.isExpired) {
+                <span class="badge badge-warning">Expired</span>
+              } @else {
+                <span class="badge badge-info">Pending</span>
+              }
+            </td>
+            <td class="text-right">
+              @if (!invitation.isAccepted && !invitation.isRevoked) {
+                <div class="join">
+                  @if (!invitation.isExpired && !invitation.isLocked) {
+                    <button class="btn btn-sm btn-outline join-item" (click)="openDuration(invitation)">Edit</button>
+                  } @else {
+                    <button class="btn btn-sm btn-outline join-item" (click)="resend(invitation)">Resend</button>
+                  }
+                  <button class="btn btn-sm btn-outline btn-error join-item" (click)="openRevoke(invitation)">Revoke</button>
+                </div>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="4" class="text-center py-6 text-base-content/60">No invitations yet.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<app-modal [isOpen]="isCreateOpen()" title="New invitation" (closed)="closeCreate()">
+  <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="space-y-4">
+    <app-text-input label="Invitee name" formControlName="inviteeName" [hasIcon]="false" />
+    <app-text-input label="Invitee email" type="email" formControlName="inviteeEmail" [hasIcon]="false" />
+    <app-select-input
+      label="Campus"
+      placeholder="Select a campus"
+      formControlName="campusId"
+      [options]="campusOptions()"
+    />
+    <app-text-input label="Duration (days)" type="number" formControlName="duration" [hasIcon]="false" />
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost" (click)="closeCreate()">Cancel</button>
+      <button type="submit" class="btn btn-primary" [disabled]="createForm.invalid">Send invitation</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-modal [isOpen]="isDurationOpen()" title="Edit invitation duration" (closed)="closeDuration()">
+  @if (targetInvitation(); as invitation) {
+    <form [formGroup]="durationForm" (ngSubmit)="submitDuration()" class="space-y-4">
+      <p class="text-sm text-base-content/70">{{ invitation.inviteeName }} — {{ invitation.campusName }}</p>
+      <app-text-input label="Duration (days)" type="number" formControlName="duration" [hasIcon]="false" />
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost" (click)="closeDuration()">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="durationForm.invalid">Save changes</button>
+      </div>
+    </form>
+  }
+</app-modal>
+
+<app-modal [isOpen]="isRevokeOpen()" title="Revoke invitation" (closed)="closeRevoke()">
+  @if (targetInvitation(); as invitation) {
+    <div class="space-y-4">
+      <p class="text-sm">Revoke the invitation for <span class="font-semibold">{{ invitation.inviteeName }}</span> ({{ invitation.campusName }})?</p>
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost" (click)="closeRevoke()">Cancel</button>
+        <button type="button" class="btn btn-error text-error-content" (click)="confirmRevoke()">Revoke</button>
+      </div>
+    </div>
+  }
+</app-modal>

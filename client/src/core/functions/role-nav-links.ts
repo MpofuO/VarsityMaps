@@ -10,7 +10,10 @@ const RoleNavLinks: Record<string, NavLink[]> = {
         { label: 'Universities', path: '/system-admin/universities' },
         { label: 'Applications', path: '/system-admin/applications' }
     ],
-    [UniversityAdminRole]: [],
+    [UniversityAdminRole]: [
+        { label: 'Campuses', path: '/university-admin/campuses' },
+  { label: 'Invitations', path: '/university-admin/invitations' }
+    ],
     [CampusAdminRole]: [],
     [StandardUserRole]: []
 };

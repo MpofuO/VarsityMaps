@@ -301,8 +301,7 @@ namespace API.Data.Migrations
 
                     b.HasKey("InvitationId");
 
-                    b.HasIndex("CampusId")
-                        .IsUnique();
+                    b.HasIndex("CampusId");
 
                     b.ToTable("Invitation", (string)null);
                 });
@@ -588,8 +587,8 @@ namespace API.Data.Migrations
             modelBuilder.Entity("API.Entities.Invitation", b =>
                 {
                     b.HasOne("API.Entities.Campus", "Campus")
-                        .WithOne("Invitation")
-                        .HasForeignKey("API.Entities.Invitation", "CampusId")
+                        .WithMany("Invitations")
+                        .HasForeignKey("CampusId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -673,8 +672,7 @@ namespace API.Data.Migrations
                 {
                     b.Navigation("Buildings");
 
-                    b.Navigation("Invitation")
-                        .IsRequired();
+                    b.Navigation("Invitations");
 
                     b.Navigation("Nodes");
                 });

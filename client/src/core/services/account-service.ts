@@ -5,6 +5,7 @@ import { LoginModel, RegisterInstitutionModel, RegisterModel, AcceptInvitationMo
 import { User } from '../../types/user';
 import { environment } from '../../environments/environment';
 import { BaseService } from './base-service';
+import { University } from '../../types/university';
 
 export const SystemAdminRole = 'SystemAdmin';
 export const UniversityAdminRole = 'UniversityAdmin';
@@ -56,6 +57,10 @@ export class AccountService extends BaseService {
       tap((user) => this.setAuthenticatedUser(user)),
       catchError((error: HttpErrorResponse) => throwError(() => error))
     );
+  }
+
+  getMyUniversity() {
+    return this.http.get<University>(`${this.apiUrl}/account/my-university`);
   }
 
   logout(): void {

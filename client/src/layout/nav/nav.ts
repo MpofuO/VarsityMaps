@@ -1,7 +1,8 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { AccountService } from '../../core/services/account-service';
+import { AccountService, SystemAdminRole } from '../../core/services/account-service';
 import { ThemeService } from '../../core/services/theme-service';
+import { UniversityService } from '../../core/services/university-service';
 import { roleHomeRoute } from '../../core/functions/role-home';
 import { roleNavLinks } from '../../core/functions/role-nav-links';
 import { BusyService } from '../../core/services/busy-service';
@@ -23,6 +24,25 @@ export class Nav {
     const role = this.accountService.currentUser()?.roles?.[0];
     return role ? roleNavLinks(role) : [];
   });
+
+  protected readonly universityName = signal<string | null>(null);
+
+  constructor() {
+    effect(() => {
+      const user = this.accountService.currentUser();
+      const isSystemAdmin = user?.roles?.includes(SystemAdminRole) ?? false;
+
+      if (!user || isSystemAdmin) {
+        this.universityName.set(null);
+        return;
+      }
+
+      this.accountService.getMyUniversity().subscribe({
+        next: (university) => this.universityName.set(university.name),
+        error: () => this.universityName.set(null)
+      });
+    });
+  }
 
   dashboardRoute(): string {
     const role = this.accountService.currentUser()?.roles?.[0] ?? '';

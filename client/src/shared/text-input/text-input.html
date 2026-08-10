@@ -8,6 +8,7 @@
   <div class="relative">
     <input
       [class]="inputClass()"
+      [class.pl-10]="hasIcon()"
       [class.input-error]="shouldShowError"
       [class.input-success]="control.valid && control.touched"
       [type]="type()"

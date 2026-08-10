@@ -29,6 +29,7 @@ public static class DtoExtensions
             InviteeName = invitation.InviteeName,
             IsExpired = invitation.DateCreated.AddDays(invitation.Duration) < DateTime.UtcNow,
             IsLocked = invitation.FailedPassAttempts >= 3,
+            IsRevoked = invitation.IsRevoked,
             CampusId = invitation.CampusId,
             CampusName = invitation.Campus?.Name ?? string.Empty,
             UniversityName = invitation.Campus?.University?.Name ?? string.Empty

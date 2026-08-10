@@ -5,6 +5,7 @@ using API.Entities;
 using API.Extensions;
 using API.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -12,31 +13,49 @@ namespace API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Policy = "RequireUniversityAdminRole")]
-public class InvitationController(IUnitOfWork uow, IMailService mailService) : ControllerBase
+public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork uow, IMailService mailService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IEnumerable<InvitationDto>>> GetAll()
     {
-        var invitations = await uow.InvitationRepository.GetAllAsync();
-        return Ok(invitations.Select(i => i.ToDto()));
+        var universityId = await User.GetUniversityIdAsync(userManager);
+        var invitations = await uow.InvitationRepository.GetAllWithDetailsAsync(universityId);
+        return Ok(invitations.OrderByDescending(i => i.DateCreated).Select(i => i.ToDto()));
     }
 
     [HttpGet("{id:int}")]
     [AllowAnonymous]
     public async Task<ActionResult<InvitationDto>> Get(int id)
     {
-        var invitation = await uow.InvitationRepository.GetAllWithDetailsAsync(id);
+        var invitation = await uow.InvitationRepository.GetWithDetailsAsync(id);
         if (invitation is null) return NotFound();
         return Ok(invitation.ToDto());
+    }
+
+    [HttpGet("campus/{campusId:int}/pending")]
+    public async Task<ActionResult<int>> GetPendingInvitationId(int campusId)
+    {
+        var campus = await uow.CampusRepository.GetByIdAsync(campusId);
+        if (campus is null) return NotFound();
+
+        var universityId = await User.GetUniversityIdAsync(userManager);
+        if (campus.UniversityId != universityId) return Forbid();
+
+        var pending = await uow.InvitationRepository.GetPendingInvitationAsync(campusId);
+        return Ok(pending?.InvitationId ?? 0);
     }
 
     [HttpPost]
     public async Task<ActionResult<InvitationDto>> Create(CreateInvitationDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var invitationExists = (await uow.InvitationRepository.GetAllAsync())
-            .Any(i => i.CampusId == dto.CampusId && (i.IsAccepted || !i.IsRevoked));
-        if (invitationExists) return BadRequest("A pending or accepted invitation for this campus already exists.");
+
+        var campus = await uow.CampusRepository.GetByIdAsync(dto.CampusId);
+        if (campus is null) return BadRequest("Please enter a valid campus");
+
+        var pending = await uow.InvitationRepository.GetPendingInvitationAsync(dto.CampusId);
+        if (pending is not null)
+            return BadRequest("This campus already has a pending invitation.");
 
         var (pin, hash, salt) = GeneratePin();
         var invitation = new Invitation
@@ -59,6 +78,24 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         return Ok(invitation.ToDto());
     }
 
+    [HttpPut("{id:int}/duration")]
+    public async Task<ActionResult<InvitationDto>> UpdateDuration(int id, [FromBody] int duration)
+    {
+        var invitation = await uow.InvitationRepository.GetByIdAsync(id);
+        if (invitation is null) return NotFound();
+        if (invitation.IsAccepted) return BadRequest("Cannot update an accepted invitation.");
+        if (invitation.IsRevoked) return BadRequest("Cannot update a revoked invitation.");
+
+        var pending = await uow.InvitationRepository.GetPendingInvitationAsync(invitation.CampusId);
+        if (pending is not null && pending.InvitationId != invitation.InvitationId)
+            return BadRequest("This campus already has a pending invitation.");
+
+        invitation.Duration = duration;
+        await uow.InvitationRepository.UpdateAsync(invitation);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to update invitation.");
+        return Ok(invitation.ToDto());
+    }
+
     [HttpPost("{id:int}/reset-pin")]
     public async Task<ActionResult<InvitationDto>> ResetPin(int id)
     {
@@ -67,12 +104,15 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         if (invitation.IsAccepted) return BadRequest("Cannot reset PIN for an accepted invitation.");
         if (invitation.IsRevoked) return BadRequest("Cannot reset PIN for a revoked invitation.");
 
+        var pending = await uow.InvitationRepository.GetPendingInvitationAsync(invitation.CampusId);
+        if (pending is not null && pending.InvitationId != invitation.InvitationId)
+            return BadRequest("This campus already has a pending invitation.");
+
         var (pin, hash, salt) = GeneratePin();
         invitation.PasswordHash = hash;
         invitation.PasswordSalt = salt;
         invitation.FailedPassAttempts = 0;
-
-        Console.WriteLine($"Generated PIN: {pin} for {invitation.InviteeEmail}");
+        invitation.DateCreated = DateTime.UtcNow;
 
         await uow.InvitationRepository.UpdateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to reset PIN.");
@@ -90,6 +130,10 @@ public class InvitationController(IUnitOfWork uow, IMailService mailService) : C
         if (invitation is null) return NotFound();
         if (invitation.IsAccepted) return BadRequest("Cannot resend an accepted invitation.");
         if (invitation.IsRevoked) return BadRequest("Cannot resend a revoked invitation.");
+
+        var pending = await uow.InvitationRepository.GetPendingInvitationAsync(invitation.CampusId);
+        if (pending is not null && pending.InvitationId != invitation.InvitationId)
+            return BadRequest("This campus already has a pending invitation.");
 
         invitation.DateCreated = DateTime.UtcNow;
 

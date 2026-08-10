@@ -1,0 +1,18 @@
+<app-modal [isOpen]="isOpen()" title="Select campus location" (closed)="onClose()">
+  <div class="space-y-3">
+    <p class="text-xs text-base-content/60">Click anywhere on the map to place a marker, or drag it to fine-tune the position.</p>
+    <div #mapContainer class="w-full h-80 rounded-box border border-base-300"></div>
+
+    @if (selected(); as point) {
+      <div class="flex gap-4 text-xs text-base-content/70">
+        <span>Lat: {{ point.lat.toFixed(6) }}</span>
+        <span>Lng: {{ point.lng.toFixed(6) }}</span>
+      </div>
+    }
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost" (click)="onClose()">Cancel</button>
+      <button type="button" class="btn btn-primary" [disabled]="!selected()" (click)="confirm()">Use this location</button>
+    </div>
+  </div>
+</app-modal>

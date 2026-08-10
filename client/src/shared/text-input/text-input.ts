@@ -17,11 +17,12 @@ export class TextInput implements ControlValueAccessor {
   max = input<number | string | null>(null);
   step = input<number | string | null>(null);
   containerClass = input<string>('form-control w-full');
-  inputClass = input<string>('input input-bordered w-full pl-10 text-sm focus:input-primary transition-all');
+  inputClass = input<string>('input input-bordered w-full text-sm focus:input-primary transition-all');
   labelClass = input<string>('label pb-1');
   labelTextClass = input<string>('label-text font-medium text-xs');
   errorClass = input<string>('label-text-alt text-error text-[10px]');
   errorMessages = input<Record<string, string>>({});
+  hasIcon = input<boolean>(true);
 
   value = '';
   disabled = false;
@@ -61,7 +62,6 @@ export class TextInput implements ControlValueAccessor {
     this.onTouched();
   }
 
-  // --- Helpers & Error Handling ---
   get control(): FormControl {
     return (this.ngControl?.control as FormControl) ?? null;
   }

@@ -17,7 +17,8 @@ public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow)
     [HttpGet]
     public async Task<ActionResult<IEnumerable<CampusDto>>> GetAll()
     {
-        var campuses = await uow.CampusRepository.GetAllAsync();
+        int universityId = await User.GetUniversityIdAsync(userManager);
+        var campuses = await uow.CampusRepository.GetByUniversityAsync(universityId);
         return Ok(campuses.Select(c => c.ToDto()));
     }
 

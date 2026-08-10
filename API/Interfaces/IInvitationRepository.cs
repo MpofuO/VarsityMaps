@@ -4,6 +4,7 @@ namespace API.Interfaces;
 
 public interface IInvitationRepository : IBaseRepository<Invitation>
 {
-    public Task<IEnumerable<Invitation>> GetAllWithDetailsAsync();
-    public Task<Invitation?> GetAllWithDetailsAsync(int id);
+    public Task<IEnumerable<Invitation>> GetAllWithDetailsAsync(int universityId);
+    public Task<Invitation?> GetWithDetailsAsync(int id);
+    public Task<Invitation?> GetPendingInvitationAsync(int campusId);
 }

@@ -8,11 +8,12 @@ import { Login } from '../features/auth/login/login';
 import { RegisterStandardUser } from '../features/onboarding/register-standard-user/register-standard-user';
 import { RegisterInstitution } from '../features/onboarding/register-institution/register-institution';
 import { AcceptInvitation } from '../features/onboarding/accept-invitation/accept-invitation';
-import { UniversityAdmin } from '../features/university-admin/university-admin';
 import { CampusAdmin } from '../features/campus/campus-admin/campus-admin';
 import { Student } from '../features/campus/student/student';
 import { Universities } from '../features/system-admin/universities/universities';
 import { Applications } from '../features/system-admin/applications/applications';
+import { Campuses } from '../features/university-admin/campuses/campuses';
+import { Invitations } from '../features/university-admin/invitations/invitations';
 
 export const routes: Routes = [
   { path: '', component: Landing, canActivate: [publicGuard] },
@@ -21,15 +22,23 @@ export const routes: Routes = [
   { path: 'register-institution', component: RegisterInstitution },
   { path: 'accept-invitation/:id', component: AcceptInvitation },
   {
-  path: 'system-admin',
-  canActivate: [authGuard, roleGuard([SystemAdminRole])],
-  children: [
-    { path: '', redirectTo: 'universities', pathMatch: 'full' },
-    { path: 'universities', component: Universities },
-    { path: 'applications', component: Applications }
-  ]
-},
-  { path: 'university-admin', component: UniversityAdmin, canActivate: [authGuard, roleGuard([UniversityAdminRole])] },
+    path: 'system-admin',
+    canActivate: [authGuard, roleGuard([SystemAdminRole])],
+    children: [
+      { path: '', redirectTo: 'universities', pathMatch: 'full' },
+      { path: 'universities', component: Universities },
+      { path: 'applications', component: Applications }
+    ]
+  },
+  {
+    path: 'university-admin',
+    canActivate: [authGuard, roleGuard([UniversityAdminRole])],
+    children: [
+      { path: '', redirectTo: 'campuses', pathMatch: 'full' },
+      { path: 'campuses', component: Campuses },
+      { path: 'invitations', component: Invitations },
+    ]
+  },
   { path: 'admin/campus', component: CampusAdmin, canActivate: [authGuard, roleGuard([CampusAdminRole])] },
   { path: 'map', component: Student, canActivate: [authGuard, roleGuard([StandardUserRole])] },
   { path: 'not-found', redirectTo: '' },

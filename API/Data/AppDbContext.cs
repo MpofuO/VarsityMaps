@@ -100,7 +100,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
         builder.Entity<Invitation>()
             .HasOne(i => i.Campus)
-            .WithOne(c => c.Invitation)
-            .HasForeignKey<Invitation>(i => i.CampusId);
+            .WithMany(c => c.Invitations)
+            .HasForeignKey(i => i.CampusId);
     }
 }

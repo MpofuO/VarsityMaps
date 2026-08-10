@@ -133,6 +133,16 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
         return await user.ToDto(tokenService);
     }
 
+    [HttpGet("my-university")]
+    [Authorize]
+    public async Task<ActionResult<UniversityDto>> GetMyUniversity()
+    {
+        var universityId = await User.GetUniversityIdAsync(userManager);
+        var university = await uow.UniversityRepository.GetByIdAsync(universityId);
+        if (university is null) return NotFound();
+        return Ok(university.ToDto());
+    }
+
     [HttpPost("logout")]
     [Authorize]
     public async Task<ActionResult> Logout()
