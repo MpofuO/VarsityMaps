@@ -1,6 +1,7 @@
-import { Component, ElementRef, ViewChild, effect, input, output, signal } from '@angular/core';
-import { Modal } from '../modal/modal';
-import { loadGoogleMaps } from '../../core/functions/load-google-maps';
+import { Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
+import { Modal } from '../../modal/modal';
+import { defaultMapOptions, loadGoogleMaps } from '../../../core/functions/load-google-maps';
+import { SA_UNIVERSITIES, UniversityLookup } from '../../../core/data/universities';
 
 const SOUTH_AFRICA_CENTER = { lat: -28.4793, lng: 24.6727 };
 const DEFAULT_ZOOM = 5;
@@ -14,16 +15,22 @@ const SELECTED_ZOOM = 16;
   styleUrl: './coordinate-picker.css'
 })
 export class CoordinatePicker {
-  isOpen = input(false);
-  initialLatitude = input<number | null>(null);
-  initialLongitude = input<number | null>(null);
+  public isOpen = input(false);
+  public initialLatitude = input<number | null>(null);
+  public initialLongitude = input<number | null>(null);
 
-  picked = output<{ latitude: number; longitude: number }>();
-  closed = output<void>();
+  public picked = output<{ latitude: number; longitude: number }>();
+  public closed = output<void>();
 
   @ViewChild('mapContainer') private mapContainer?: ElementRef<HTMLDivElement>;
 
   protected readonly selected = signal<{ lat: number; lng: number } | null>(null);
+  protected readonly searchQuery = signal('');
+  protected readonly searchResults = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    if (q.length < 2) return [];
+    return SA_UNIVERSITIES.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 6);
+  });
 
   private map?: google.maps.Map;
   private marker?: google.maps.Marker;
@@ -42,7 +49,12 @@ export class CoordinatePicker {
       return;
     }
 
-    const hasInitial = this.initialLatitude() !== null && this.initialLongitude() !== null;
+    const hasInitial =
+      this.initialLatitude() !== null &&
+      this.initialLongitude() !== null &&
+      this.initialLatitude() !== 0 &&
+      this.initialLongitude() !== 0;
+
     const center = hasInitial
       ? { lat: this.initialLatitude()!, lng: this.initialLongitude()! }
       : SOUTH_AFRICA_CENTER;
@@ -52,7 +64,8 @@ export class CoordinatePicker {
         center,
         zoom: hasInitial ? SELECTED_ZOOM : DEFAULT_ZOOM,
         streetViewControl: false,
-        mapTypeControl: false
+        fullscreenControl: true,
+        ...defaultMapOptions()
       });
 
       this.map.addListener('click', (event: google.maps.MapMouseEvent) => {
@@ -77,7 +90,13 @@ export class CoordinatePicker {
 
   private placeMarker(position: google.maps.LatLng): void {
     if (!this.marker) {
-      this.marker = new google.maps.Marker({ map: this.map, position, draggable: true });
+      this.marker = new google.maps.Marker({
+        map: this.map,
+        position,
+        draggable: true,
+        animation: google.maps.Animation.DROP
+      });
+
       this.marker.addListener('dragend', () => {
         const pos = this.marker!.getPosition();
         if (pos) {
@@ -87,7 +106,16 @@ export class CoordinatePicker {
     } else {
       this.marker.setPosition(position);
     }
+
     this.selected.set({ lat: position.lat(), lng: position.lng() });
+  }
+
+  selectSearchResult(university: UniversityLookup): void {
+    this.searchQuery.set(university.name);
+    if (this.map) {
+      this.map.panTo({ lat: university.lat, lng: university.lng });
+      this.map.setZoom(SELECTED_ZOOM);
+    }
   }
 
   confirm(): void {

@@ -5,7 +5,7 @@ import { Application } from '../../../types/application';
 import { Modal } from '../../../shared/modal/modal';
 import { ToastService } from '../../../core/services/toast-service';
 
-type ApplicationFilter = 'pending' | 'approved' | 'rejected' | 'all';
+export type ApplicationFilter = 'pending' | 'approved' | 'rejected' | 'all';
 
 @Component({
   selector: 'app-applications',
@@ -23,6 +23,10 @@ export class Applications implements OnInit {
   protected readonly targetApplication = signal<Application | null>(null);
   protected readonly isRejectOpen = signal(false);
   protected readonly rejectionReason = signal('');
+
+  protected readonly pendingCount = computed(() =>
+    this.applications().filter((a) => a.isApproved === null).length
+  );
 
   protected readonly filteredApplications = computed(() => {
     const list = this.applications();
@@ -42,6 +46,10 @@ export class Applications implements OnInit {
     this.universityService.getApplications().subscribe({
       next: (applications) => this.applications.set(applications)
     });
+  }
+
+  setFilter(status: ApplicationFilter): void {
+    this.filter.set(status);
   }
 
   approve(application: Application): void {

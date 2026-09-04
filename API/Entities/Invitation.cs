@@ -11,6 +11,7 @@ public class Invitation
     public int Duration { get; set; }
     public bool IsRevoked { get; set; }
     public bool IsAccepted { get; set; }
+    public bool IsRejected { get; set; }
     public int FailedPassAttempts { get; set; }
     
     public int CampusId { get; set; }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using API.Helpers;
+using NetTopologySuite.Geometries;
 
 namespace API.Controllers;
 
@@ -60,8 +61,8 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         if (dto.Nodes.Count < 2) return BadRequest("At least two nodes are required.");
 
         var campusId = await User.GetCampusIdAsync(userManager);
-        var resolvedNodes = new List<Node>();
 
+        var points = new List<Point>();
         foreach (var item in dto.Nodes)
         {
             if (item.ExistingNodeId is int existingId)
@@ -69,14 +70,34 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
                 var existing = await uow.NodeRepository.GetByIdAsync(existingId);
                 if (existing is null) return BadRequest($"Node {existingId} not found.");
                 if (existing.CampusId != campusId) return BadRequest($"Node {existingId} does not belong to your campus.");
-                resolvedNodes.Add(existing);
+                points.Add(existing.Location);
             }
             else
             {
-                if (item.Location is null || string.IsNullOrWhiteSpace(item.Name))
-                    return BadRequest("New path nodes require both a name and a location.");
+                if (item.Location is null) return BadRequest("New path nodes require a location.");
+                points.Add(item.Location);
+            }
+        }
 
-                var newNode = new Node { Name = item.Name, Location = item.Location, CampusId = campusId };
+        var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            var segment = new LineString(new[] { points[i].Coordinate, points[i + 1].Coordinate });
+            if (buildings.Any(b => b.Boundary.Intersects(segment)))
+                return BadRequest("A path segment crosses a building - adjust the route.");
+        }
+
+        var resolvedNodes = new List<Node>();
+        foreach (var item in dto.Nodes)
+        {
+            if (item.ExistingNodeId is int existingId)
+            {
+                resolvedNodes.Add(await uow.NodeRepository.GetByIdAsync(existingId)
+                    ?? throw new InvalidOperationException("Node vanished mid-request."));
+            }
+            else
+            {
+                var newNode = new Node { Name = item.Name, Location = item.Location!, CampusId = campusId };
                 await uow.NodeRepository.CreateAsync(newNode);
                 resolvedNodes.Add(newNode);
             }
@@ -89,14 +110,29 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
             {
                 FromNode = resolvedNodes[i],
                 ToNode = resolvedNodes[i + 1],
+                CampusId = campusId,
                 Weight = (decimal)GeoHelper.DegreeDistanceToMeters(degreeDistance, resolvedNodes[i + 1].Location.Y)
             };
             await uow.EdgeRepository.CreateAsync(edge);
         }
 
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add nodes.");
-
         return Ok(resolvedNodes.Select(n => n.ToDto()).ToList());
+    }
+
+    [HttpPut("{nodeId:int}/name")]
+    public async Task<ActionResult<NodeDto>> RenameNode(int nodeId, [FromBody] RenameDto renameDto)
+    {
+        var node = await uow.NodeRepository.GetByIdAsync(nodeId);
+        if (node is null) return NotFound();
+
+        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        if (node.CampusId != callerCampusId) return NotFound();
+
+        node.Name = renameDto.Name;
+        await uow.NodeRepository.UpdateAsync(node);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to rename node.");
+        return Ok(node.ToDto());
     }
 
     [HttpDelete("{nodeId:int}")]

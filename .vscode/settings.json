@@ -1,1 +1,10 @@
-{}
+{
+    "workbench.activityBar.autoHide": false,
+    "workbench.colorTheme": "Dark Modern",
+    "workbench.preferredDarkColorTheme": "Dark Modern",
+    "workbench.statusBar.visible": false,
+    "editor.suggest.showStatusBar": false,
+    "debug.toolBarLocation": "floating",
+    "breadcrumbs.enabled": true,
+    "workbench.iconTheme": "material-icon-theme"
+}

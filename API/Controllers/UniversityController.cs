@@ -1,3 +1,4 @@
+using System.Text.Json;
 using API.DTOs;
 using API.Entities;
 using API.Extensions;
@@ -17,7 +18,7 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
     [AllowAnonymous]
     public async Task<ActionResult<IEnumerable<UniversityDto>>> GetUniversities()
     {
-        var universities = await uow.UniversityRepository.GetAllAsync();
+        var universities = await uow.UniversityRepository.GetAllWithCampuses();
         return Ok(universities.OrderBy(u => u.Name).Select(u => u.ToDto()));
     }
 
@@ -56,8 +57,18 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var existing = await userManager.FindByEmailAsync(applyDto.Email);
-        if (existing is not null) return BadRequest("An account with this email already exists.");
+        var existingUser = await userManager.FindByEmailAsync(applyDto.Email);
+        if (existingUser is not null) return BadRequest("An account with this email already exists.");
+
+        var existingUniversity = await uow.UniversityRepository.GetByNameAsync(applyDto.UniversityName);
+        if (existingUniversity is not null) return BadRequest("A university with this name already exists.");
+        existingUniversity = await uow.UniversityRepository.GetByAliasAsync(applyDto.UniversityAlias);
+        if (existingUniversity is not null) return BadRequest("A university with this alias already exists.");
+
+        var existingApplication = await uow.ApplicationRepository.GetByNameAsync(applyDto.UniversityName);
+        if (existingApplication is not null) return BadRequest("A pending application with this name already exists.");
+        existingApplication = await uow.ApplicationRepository.GetByAliasAsync(applyDto.UniversityAlias);
+        if (existingApplication is not null) return BadRequest("A pending application with this alias already exists.");
 
         var user = new AppUser
         {
@@ -74,7 +85,6 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
             UserId = user.Id,
             UniversityName = applyDto.UniversityName,
             UniversityAlias = applyDto.UniversityAlias,
-            CampusCount = applyDto.CampusCount,
             DateCreated = DateTime.UtcNow
         };
 
@@ -125,11 +135,12 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
 
         var roleResult = await userManager.AddToRoleAsync(user, "UniversityAdmin");
         if (!roleResult.Succeeded) return BadRequest(roleResult.Errors);
-        
+
         try
         {
             await mailService.SendApplicationApprovedAsync(user.Email!, university.Name);
-        }catch { }
+        }
+        catch { }
 
         return Ok();
     }

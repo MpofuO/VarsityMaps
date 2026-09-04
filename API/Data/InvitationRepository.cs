@@ -27,11 +27,21 @@ public class InvitationRepository : BaseRepository<Invitation>, IInvitationRepos
             .ThenInclude(c => c.University)
             .FirstOrDefaultAsync(i => i.InvitationId == id);
     }
+
     public async Task<Invitation?> GetPendingInvitationAsync(int campusId)
     {
         return await context.Invitations
-            .Where(i => i.CampusId == campusId && !i.IsAccepted && !i.IsRevoked && 
-                        i.DateCreated.AddDays(i.Duration) >= DateTime.UtcNow && 
+            .Where(i => i.CampusId == campusId && !i.IsAccepted && !i.IsRevoked && !i.IsRejected &&
+                        i.DateCreated.AddDays(i.Duration) >= DateTime.UtcNow &&
+                        i.FailedPassAttempts < 3).FirstOrDefaultAsync();
+    }
+
+    public async Task<Invitation?> GetPendingInvitationByEmailAsync(string email)
+    {
+        return await context.Invitations
+            .Include(i => i.Campus)
+            .Where(i => i.InviteeEmail == email && !i.IsAccepted && !i.IsRevoked && !i.IsRejected &&
+                        i.DateCreated.AddDays(i.Duration) >= DateTime.UtcNow &&
                         i.FailedPassAttempts < 3).FirstOrDefaultAsync();
     }
 }

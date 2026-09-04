@@ -18,6 +18,18 @@
 
       @if (step === 0) {
       <div class="space-y-6 my-2">
+        @if (isDeclined()) {
+        <div class="alert alert-success shadow-sm text-xs rounded-lg">
+          <span>You've declined this invitation. You're free to register normally whenever you're ready.</span>
+        </div>
+        } @else {
+        @if (wasRedirected()) {
+        <div class="alert alert-info shadow-sm text-xs rounded-lg">
+          <span>We found a pending Campus Administrator invitation for this email - that's why you've landed here
+            instead of continuing your student registration.</span>
+        </div>
+        }
+
         @if (isLoading()) {
         <div class="flex justify-center py-8">
           <span class="loading loading-spinner loading-md text-primary"></span>
@@ -46,7 +58,11 @@
           <div class="pt-2 border-t border-base-300/60 flex flex-col gap-1.5 text-xs">
             <span class="text-base-content/60 font-medium">Invitation Status</span>
             <div>
-              @if (details.isLocked) {
+              @if (details.isRevoked) {
+              <span class="badge badge-error badge-sm gap-1">Revoked</span>
+              } @else if (details.isRejected) {
+              <span class="badge badge-error badge-sm gap-1">Rejected</span>
+              } @else if (details.isLocked) {
               <span class="badge badge-error badge-sm gap-1">Locked (Max PIN Attempts)</span>
               } @else if (details.isExpired) {
               <span class="badge badge-warning badge-sm gap-1">Expired</span>
@@ -57,19 +73,36 @@
           </div>
         </div>
 
-        <button class="btn btn-primary w-full mt-6 shadow-sm" type="button" (click)="nextStep()"
-          [disabled]="details.isLocked || details.isExpired">
-          Continue to Account Setup
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current" viewBox="0 0 20 20">
-            <path fill-rule="evenodd"
-              d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-              clip-rule="evenodd" />
-          </svg>
-        </button>
+        @if (details.isRevoked) {
+        <div class="alert alert-error text-xs shadow-sm rounded-lg">
+          <span>This invitation has been revoked by an administrator. Please contact support or your system administrator if you believe this is an error.</span>
+        </div>
+        } @else if (details.isRejected) {
+        <div class="alert alert-error text-xs shadow-sm rounded-lg">
+          <span>This invitation has previously been rejected. Please contact your administrator if you need a new invitation.</span>
+        </div>
+        }
+
+        <div class="flex flex-col sm:flex-row gap-3 mt-6">
+          <button class="btn btn-ghost border border-base-300" type="button" (click)="declineInvitation()"
+            [disabled]="details.isRevoked || details.isRejected || details.isLocked || details.isExpired">
+            Decline invitation
+          </button>
+          <button class="btn btn-primary flex-1 shadow-sm" type="button" (click)="nextStep()"
+            [disabled]="details.isRevoked || details.isRejected || details.isLocked || details.isExpired">
+            Continue to Account Setup
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+              <path fill-rule="evenodd"
+                d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
         } @else {
         <div class="alert alert-error text-xs shadow-sm rounded-lg">
           <span>Unable to load invitation details. Please check the URL or contact your system administrator.</span>
         </div>
+        }
         }
       </div>
       } @else {

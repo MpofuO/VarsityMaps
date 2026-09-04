@@ -10,6 +10,7 @@ import { SelectInput, SelectOption } from '../../../shared/select-input/select-i
 import { University } from '../../../types/university';
 import { Campus } from '../../../types/campus';
 import { RegisterModel } from '../../../types/auth';
+import { passwordsMatchValidator } from '../../../core/functions/account-functions';
 
 @Component({
   selector: 'app-register-standard-user',
@@ -27,6 +28,7 @@ export class RegisterStandardUser implements OnInit {
 
   protected step = 0;
   protected isVerified = false;
+  protected readonly isCheckingEmail = signal(false);
 
   protected universityOptions = signal<SelectOption[]>([]);
   protected campusOptions = signal<SelectOption[]>([]);
@@ -34,7 +36,7 @@ export class RegisterStandardUser implements OnInit {
   protected readonly accountForm = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
-    confirmPassword: ['', Validators.required],
+    confirmPassword: ['', [Validators.required, passwordsMatchValidator]],
     universityId: ['', Validators.required],
     campusId: [{ value: '', disabled: true }, Validators.required],
   });
@@ -44,6 +46,18 @@ export class RegisterStandardUser implements OnInit {
 
     this.accountForm.controls.universityId.valueChanges.subscribe((univId) => {
       this.onUniversityChange(Number(univId));
+    });
+
+    this.accountForm.controls.password.valueChanges.subscribe(() => {
+      this.accountForm.controls.confirmPassword.updateValueAndValidity({ onlySelf: true });
+    });
+
+    this.accountForm.controls.email.valueChanges.subscribe(() => {
+      const errors = this.accountForm.controls.email.errors;
+      if (errors?.['emailTaken']) {
+        const { emailTaken, ...rest } = errors;
+        this.accountForm.controls.email.setErrors(Object.keys(rest).length ? rest : null);
+      }
     });
   }
 
@@ -88,13 +102,37 @@ export class RegisterStandardUser implements OnInit {
   }
 
   nextStep(): void {
-    if (this.accountForm.valid) {
-      if (this.accountForm.value.password !== this.accountForm.value.confirmPassword) {
-        this.toastService.error('Passwords do not match.');
-        return;
-      }
-      this.step = 1;
+    if (!this.accountForm.valid) {
+      return;
     }
+
+    const email = this.accountForm.controls.email.value;
+    this.isCheckingEmail.set(true);
+
+    this.accountService.emailExists(email).subscribe({
+      next: (result) => {
+        this.isCheckingEmail.set(false);
+
+        if (result.pendingInvitationId) {
+          this.router.navigate(['/accept-invitation', result.pendingInvitationId], {
+            queryParams: { redirected: 'true' },
+          });
+          return;
+        }
+
+        if (result.exists) {
+          this.accountForm.controls.email.setErrors({ emailTaken: true });
+          this.accountForm.controls.email.markAsTouched();
+          return;
+        }
+
+        this.step = 1;
+      },
+      error: () => {
+        this.isCheckingEmail.set(false);
+        this.toastService.error('Unable to verify email right now — please try again.');
+      },
+    });
   }
 
   verifyEmail(): void {

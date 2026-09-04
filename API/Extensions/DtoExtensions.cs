@@ -13,7 +13,6 @@ public static class DtoExtensions
             ApplicationId = application.ApplicationId,
             UniversityName = application.UniversityName,
             UniversityAlias = application.UniversityAlias,
-            CampusCount = application.CampusCount,
             DateCreated = application.DateCreated,
             IsApproved = application.IsApproved.HasValue ? application.IsApproved.Value : null,
             DecisionReason = application.DecisionReason
@@ -27,9 +26,12 @@ public static class DtoExtensions
             InvitationId = invitation.InvitationId,
             InviteeEmail = invitation.InviteeEmail,
             InviteeName = invitation.InviteeName,
+            Duration = invitation.Duration,
+            DateCreated = invitation.DateCreated.ToString(),
             IsExpired = invitation.DateCreated.AddDays(invitation.Duration) < DateTime.UtcNow,
             IsLocked = invitation.FailedPassAttempts >= 3,
             IsRevoked = invitation.IsRevoked,
+            IsRejected = invitation.IsRejected,
             CampusId = invitation.CampusId,
             CampusName = invitation.Campus?.Name ?? string.Empty,
             UniversityName = invitation.Campus?.University?.Name ?? string.Empty
@@ -78,7 +80,20 @@ public static class DtoExtensions
         {
             UniversityId = university.UniversityId,
             Name = university.Name,
-            Alias = university.Alias
+            Alias = university.Alias,
+            CampusCount = university.Campuses?.Count() ?? 0
+        };
+    }
+
+    public static EdgeDto ToDto(this Edge edge)
+    {
+        return new EdgeDto
+        {
+            EdgeId = edge.EdgeId,
+            FromNodeId = edge.FromNodeId,
+            ToNodeId = edge.ToNodeId,
+            Weight = edge.Weight,
+            Name = edge.Name
         };
     }
 }

@@ -50,6 +50,18 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
+        var campusAdmins = await userManager.GetUsersInRoleAsync("CampusAdmin");
+        if (campusAdmins.Any(admin => admin.CampusId == dto.CampusId && admin.IsActive))
+            return BadRequest("This campus already has an assigned campus admin");
+
+        var existingForEmail = await uow.InvitationRepository.GetPendingInvitationByEmailAsync(dto.InviteeEmail);
+        if (existingForEmail is not null)
+        {
+            if (existingForEmail.CampusId == dto.CampusId)
+                return BadRequest("This campus already has a pending invitation.");
+            return BadRequest($"This email already has a pending invitation to {existingForEmail.Campus?.Name ?? "another campus"}.");
+        }
+
         var campus = await uow.CampusRepository.GetByIdAsync(dto.CampusId);
         if (campus is null) return BadRequest("Please enter a valid campus");
 
@@ -90,6 +102,8 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
         if (pending is not null && pending.InvitationId != invitation.InvitationId)
             return BadRequest("This campus already has a pending invitation.");
 
+        if (duration < invitation.Duration) return BadRequest("Duration can only be increased.");
+        
         invitation.Duration = duration;
         await uow.InvitationRepository.UpdateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update invitation.");
@@ -136,6 +150,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
             return BadRequest("This campus already has a pending invitation.");
 
         invitation.DateCreated = DateTime.UtcNow;
+        invitation.Duration = Math.Min(invitation.Duration, 7);
 
         await uow.InvitationRepository.UpdateAsync(invitation);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to resend invitation.");
@@ -159,6 +174,21 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
         if (!await uow.CompleteAsync()) return BadRequest("Failed to revoke invitation.");
 
         return Ok(invitation.ToDto());
+    }
+
+    [HttpPost("{id:int}/reject")]
+    [AllowAnonymous]
+    public async Task<ActionResult> Reject(int id)
+    {
+        var invitation = await uow.InvitationRepository.GetByIdAsync(id);
+        if (invitation is null) return NotFound();
+        if (invitation.IsAccepted) return BadRequest("This invitation has already been accepted.");
+        if (invitation.IsRevoked) return BadRequest("This invitation has already been revoked.");
+
+        invitation.IsRejected = true;
+        await uow.InvitationRepository.UpdateAsync(invitation);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to decline invitation.");
+        return Ok();
     }
 
     private static (string pin, byte[] hash, byte[] salt) GeneratePin()

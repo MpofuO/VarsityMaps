@@ -16,12 +16,16 @@ export interface RegisterInstitutionModel {
   password: string;
   universityName: string;
   universityAlias: string;
-  campusCount: number;
 }
 
 export interface AcceptInvitationModel {
   pin: string;
   password: string;
+}
+
+export interface EmailCheckResult {
+  exists: boolean;
+  pendingInvitationId: number | null;
 }
 
 export interface ToastMessage {

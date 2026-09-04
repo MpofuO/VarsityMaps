@@ -177,7 +177,7 @@ public class MailService(IOptions<MailSettings> mailSettings) : IMailService
     message.Body = builder.ToMessageBody();
 
     using var client = new SmtpClient();
-    await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.Auto);
+    await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.None);
     await client.AuthenticateAsync(_settings.Username, _settings.Password);
     await client.SendAsync(message);
     await client.DisconnectAsync(true);

@@ -11,3 +11,13 @@ export function loadGoogleMaps(): Promise<typeof google> {
 
   return loadPromise;
 }
+
+export function defaultMapOptions(): Pick<google.maps.MapOptions, 'mapTypeId' | 'mapTypeControl' | 'mapTypeControlOptions'> {
+  return {
+    mapTypeId: google.maps.MapTypeId.HYBRID,
+    mapTypeControl: true,
+    mapTypeControlOptions: {
+      mapTypeIds: [google.maps.MapTypeId.HYBRID, google.maps.MapTypeId.SATELLITE]
+    }
+  };
+}

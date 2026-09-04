@@ -1,7 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { catchError, tap, throwError } from 'rxjs';
-import { LoginModel, RegisterInstitutionModel, RegisterModel, AcceptInvitationModel } from '../../types/auth';
+import { LoginModel, RegisterInstitutionModel, RegisterModel, AcceptInvitationModel, EmailCheckResult } from '../../types/auth';
 import { User } from '../../types/user';
 import { environment } from '../../environments/environment';
 import { BaseService } from './base-service';
@@ -50,6 +50,10 @@ export class AccountService extends BaseService {
       }),
       catchError((error: HttpErrorResponse) => throwError(() => error))
     );
+  }
+
+  emailExists(email: string) {
+    return this.http.get<EmailCheckResult>(`${this.apiUrl}/account/email-exists?email=${encodeURIComponent(email)}`);
   }
 
   acceptInvitation(invitationId: number, model: AcceptInvitationModel) {

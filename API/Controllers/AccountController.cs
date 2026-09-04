@@ -7,6 +7,7 @@ using API.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers;
 
@@ -21,13 +22,22 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
             return BadRequest();
 
         var user = await userManager.FindByEmailAsync(loginDto.Email);
-        if (user is null || !await userManager.CheckPasswordAsync(user, loginDto.Password))
+        if (user is null || user.IsDeleted || !await userManager.CheckPasswordAsync(user, loginDto.Password))
         {
             return BadRequest("Invalid email or password.");
         }
 
         if (!user.IsActive)
-            return BadRequest("Account not yet active");
+        {
+            var roles = await userManager.GetRolesAsync(user);
+
+            if (roles.Contains("CampusAdmin"))
+                return BadRequest("Your account has been suspended by your university administrator.");
+            if (roles.Contains("UniversityAdmin"))
+                return BadRequest("Your institution's application is still pending approval.");
+
+            return BadRequest("Your account is not active.");
+        }
 
         return await user.ToDto(tokenService);
     }
@@ -49,30 +59,65 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
             return BadRequest("Invalid CampusId for the selected university.");
         }
 
-        var user = new AppUser
-        {
-            UserName = registerDto.Email,
-            Email = registerDto.Email,
-            UniversityId = registerDto.UniversityId,
-            CampusId = registerDto.CampusId,
-            IsActive = true
-        };
+        var (user, isNew) = await GetUserByEmailFromAll(registerDto.Email);
 
-        var result = await userManager.CreateAsync(user, registerDto.Password);
-        if (!result.Succeeded)
+        user.UniversityId = registerDto.UniversityId;
+        user.CampusId = registerDto.CampusId;
+        user.IsActive = true;
+        user.IsDeleted = false;
+
+        if (!isNew && !user.IsDeleted) return BadRequest("This email is already in use.");
+
+        if (isNew)
         {
-            return BadRequest(result.Errors);
+            var createResult = await userManager.CreateAsync(user, registerDto.Password);
+            if (!createResult.Succeeded)
+            {
+                return BadRequest(createResult.Errors);
+            }
+        }
+        else
+        {
+            var updateResult = await userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return BadRequest(updateResult.Errors);
+            }
+
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+            var resetResult = await userManager.ResetPasswordAsync(user, resetToken, registerDto.Password);
+            if (!resetResult.Succeeded)
+            {
+                return BadRequest(resetResult.Errors);
+            }
         }
 
         var roleResult = await userManager.AddToRoleAsync(user, "StandardUser");
 
         if (!roleResult.Succeeded)
         {
-            await userManager.DeleteAsync(user);
+            if (isNew) await userManager.DeleteAsync(user);
             return BadRequest(roleResult.Errors);
         }
 
         return await user.ToDto(tokenService);
+    }
+
+    [HttpGet("email-exists")]
+    [AllowAnonymous]
+    public async Task<ActionResult<EmailCheckDto>> EmailExists([FromQuery] string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return Ok(new EmailCheckDto { Exists = false, PendingInvitationId = null });
+
+        var user = await userManager.FindByEmailAsync(email);
+        var pending = await uow.InvitationRepository.GetPendingInvitationByEmailAsync(email);
+
+        return Ok(new EmailCheckDto
+        {
+            Exists = user is not null,
+            PendingInvitationId = pending?.InvitationId
+        });
     }
 
     [HttpPost("accept-invitation/{invitationId}")]
@@ -102,22 +147,34 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
         var campus = await uow.CampusRepository.GetByIdAsync(invitation.CampusId);
         if (campus is null) return BadRequest("Associated campus not found.");
 
-        var user = new AppUser
-        {
-            UserName = invitation.InviteeEmail,
-            Email = invitation.InviteeEmail,
-            UniversityId = campus.UniversityId,
-            CampusId = invitation.CampusId,
-            IsActive = true
-        };
+        var (user, isNew) = await GetUserByEmailFromAll(invitation.InviteeEmail);
 
-        var createResult = await userManager.CreateAsync(user, acceptInvitationDto.Password);
-        if (!createResult.Succeeded) return BadRequest(createResult.Errors);
+        user.UniversityId = campus.UniversityId;
+        user.CampusId = campus.CampusId;
+        user.IsActive = true;
+        user.IsDeleted = false;
+
+        if (!isNew && !user.IsDeleted) return BadRequest("This email is already in use.");
+
+        if (isNew)
+        {
+            var createResult = await userManager.CreateAsync(user, acceptInvitationDto.Password);
+            if (!createResult.Succeeded) return BadRequest(createResult.Errors);
+        }
+        else
+        {
+            var updateResult = await userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded) return BadRequest(updateResult.Errors);
+
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+            var resetResult = await userManager.ResetPasswordAsync(user, resetToken, acceptInvitationDto.Password);
+            if (!resetResult.Succeeded) return BadRequest(resetResult.Errors);
+        }
 
         var roleResult = await userManager.AddToRoleAsync(user, "CampusAdmin");
         if (!roleResult.Succeeded)
         {
-            await userManager.DeleteAsync(user);
+            if (isNew) await userManager.DeleteAsync(user);
             return BadRequest(roleResult.Errors);
         }
 
@@ -126,7 +183,7 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
 
         if (!await uow.CompleteAsync())
         {
-            await userManager.DeleteAsync(user);
+            if (isNew) await userManager.DeleteAsync(user);
             return BadRequest("Failed to accept invitation.");
         }
 
@@ -148,5 +205,18 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
     public async Task<ActionResult> Logout()
     {
         return Ok();
+    }
+
+    private async Task<(AppUser, bool)> GetUserByEmailFromAll(string email)
+    {
+        var user = await userManager.Users.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Email!.ToLower() == email.ToLower());
+        if (user is not null)
+            return (user, false);
+        return (new AppUser
+        {
+            UserName = email,
+            Email = email
+        }, true);
     }
 }

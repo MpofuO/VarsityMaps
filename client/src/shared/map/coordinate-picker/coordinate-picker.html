@@ -1,0 +1,41 @@
+<app-modal [isOpen]="isOpen()" title="Select Campus Location" (closed)="onClose()">
+  <div class="space-y-4">
+    <p class="text-xs text-base-content/70">
+      Click anywhere on the map to place a pin, or drag an existing marker to adjust the exact position.
+    </p>
+    <div class="relative">
+      <input class="input input-bordered input-sm w-full" placeholder="Search for a university to jump there…"
+        [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
+      @if (searchResults().length > 0) {
+      <ul
+        class="absolute z-20 mt-1 w-full bg-base-100 border border-base-300 rounded-box shadow-lg max-h-48 overflow-y-auto">
+        @for (result of searchResults(); track result.name) {
+        <li class="px-3 py-2 text-sm cursor-pointer hover:bg-base-200" (click)="selectSearchResult(result)">
+          {{ result.name }}
+        </li>
+        }
+      </ul>
+      }
+    </div>
+
+    <div #mapContainer class="w-full h-96 rounded-box border border-base-300 shadow-inner"></div>
+
+    <div class="flex items-center justify-between min-h-6">
+      @if (selected(); as point) {
+      <div class="flex gap-2 text-xs">
+        <span class="badge badge-neutral">Lat: {{ point.lat.toFixed(6) }}</span>
+        <span class="badge badge-neutral">Lng: {{ point.lng.toFixed(6) }}</span>
+      </div>
+      } @else {
+      <span class="text-xs text-base-content/50 italic">No location selected yet.</span>
+      }
+    </div>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="onClose()">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!selected()" (click)="confirm()">
+        Use This Location
+      </button>
+    </div>
+  </div>
+</app-modal>

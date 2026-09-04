@@ -1,17 +1,19 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { CampusService } from '../../../core/services/campus-service';
 import { AccountService } from '../../../core/services/account-service';
 import { ToastService } from '../../../core/services/toast-service';
 import { Campus } from '../../../types/campus';
 import { Modal } from '../../../shared/modal/modal';
 import { TextInput } from '../../../shared/text-input/text-input';
-import { CoordinatePicker } from '../../../shared/coordinate-picker/coordinate-picker';
+import { CoordinatePicker } from '../../../shared/map/coordinate-picker/coordinate-picker';
+import { DecimalPipe } from '@angular/common';
+import { CampusAdminDetails } from '../../../types/campus-admin-details';
 
 @Component({
   selector: 'app-campuses',
   standalone: true,
-  imports: [Modal, TextInput, ReactiveFormsModule, CoordinatePicker],
+  imports: [Modal, TextInput, ReactiveFormsModule, CoordinatePicker, DecimalPipe],
   templateUrl: './campuses.html',
   styleUrl: './campuses.css'
 })
@@ -25,12 +27,43 @@ export class Campuses implements OnInit {
   protected readonly isFormOpen = signal(false);
   protected readonly editingCampus = signal<Campus | null>(null);
   protected readonly isPickerOpen = signal(false);
+  protected readonly campusAdmin = signal<CampusAdminDetails | null>(null);
+  protected readonly isLoadingAdmin = signal(false);
+  protected readonly isUnassignConfirmOpen = signal(false);
+
+  private nameUniqueValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = (control.value as string)?.trim().toLowerCase();
+      if (!value) return null;
+
+      const editingId = this.editingCampus()?.campusId;
+      const conflict = (this.campuses() ?? []).some(
+        (c) => c.campusId !== editingId && c.name.trim().toLowerCase() === value
+      );
+
+      return conflict ? { nameTaken: true } : null;
+    };
+  }
+
+  private aliasUniqueValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = (control.value as string)?.trim().toLowerCase();
+      if (!value) return null;
+
+      const editingId = this.editingCampus()?.campusId;
+      const conflict = (this.campuses() ?? []).some(
+        (c) => c.campusId !== editingId && c.alias.trim().toLowerCase() === value
+      );
+
+      return conflict ? { aliasTaken: true } : null;
+    };
+  }
 
   protected readonly form = this.fb.nonNullable.group({
-    name: ['', Validators.required],
-    alias: ['', Validators.required],
-    latitude: [0, Validators.required],
-    longitude: [0, Validators.required]
+    name: ['', [Validators.required, this.nameUniqueValidator()]],
+    alias: ['', [Validators.required, this.aliasUniqueValidator()]],
+    latitude: [0, [Validators.required, Validators.min(-90), Validators.max(90)]],
+    longitude: [0, [Validators.required, Validators.min(-180), Validators.max(180)]]
   });
 
   ngOnInit(): void {
@@ -40,7 +73,11 @@ export class Campuses implements OnInit {
   private load(): void {
     const universityId = this.accountService.currentUser()?.universityId;
     this.campusService.getCampuses().subscribe({
-      next: (campuses) => this.campuses.set(campuses.filter((c) => c.universityId === universityId))
+      next: (campuses) => {
+        this.campuses.set(campuses.filter((c) => c.universityId === universityId));
+        this.form.controls.name.updateValueAndValidity({ onlySelf: true });
+        this.form.controls.alias.updateValueAndValidity({ onlySelf: true });
+      }
     });
   }
 
@@ -59,11 +96,60 @@ export class Campuses implements OnInit {
       longitude: campus.center.coordinates[0]
     });
     this.isFormOpen.set(true);
+    this.loadCampusAdmin(campus.campusId);
+  }
+
+  private loadCampusAdmin(campusId: number): void {
+    this.campusAdmin.set(null);
+    this.isLoadingAdmin.set(true);
+    this.campusService.getCampusAdmin(campusId).subscribe({
+      next: (admin) => {
+        this.campusAdmin.set(admin);
+        this.isLoadingAdmin.set(false);
+      },
+      error: () => this.isLoadingAdmin.set(false)
+    });
+  }
+
+  toggleSuspend(): void {
+    const campus = this.editingCampus();
+    const admin = this.campusAdmin();
+    if (!campus || !admin) return;
+
+    const suspend = admin.isActive;
+    this.campusService.suspendAdmin(campus.campusId, suspend).subscribe({
+      next: () => {
+        this.toastService.success(suspend ? 'Admin suspended.' : 'Suspension revoked.');
+        this.loadCampusAdmin(campus.campusId);
+      }
+    });
+  }
+
+  openUnassignConfirm(): void {
+    this.isUnassignConfirmOpen.set(true);
+  }
+
+  closeUnassignConfirm(): void {
+    this.isUnassignConfirmOpen.set(false);
+  }
+
+  confirmUnassign(): void {
+    const campus = this.editingCampus();
+    if (!campus) return;
+
+    this.campusService.unassignAdmin(campus.campusId).subscribe({
+      next: () => {
+        this.toastService.success('Admin unassigned — the account has been deleted.');
+        this.campusAdmin.set(null);
+        this.closeUnassignConfirm();
+      }
+    });
   }
 
   closeForm(): void {
     this.isFormOpen.set(false);
     this.editingCampus.set(null);
+    this.campusAdmin.set(null);
   }
 
   openPicker(): void {

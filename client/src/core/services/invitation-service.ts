@@ -38,4 +38,8 @@ export class InvitationService extends BaseService {
   revoke(id: number) {
     return this.http.post<Invitation>(`${this.apiUrl}/invitation/${id}/revoke`, {});
   }
+  
+  reject(id: number) {
+    return this.http.post(`${this.apiUrl}/invitation/${id}/reject`, {});
+  }
 }

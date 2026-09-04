@@ -21,7 +21,8 @@ export class Universities implements OnInit {
 
   ngOnInit(): void {
     this.universityService.getUniversities().subscribe({
-      next: (universities) => this.universities.set(universities)
+      next: (universities) => {
+        this.universities.set(universities)}
     });
   }
 

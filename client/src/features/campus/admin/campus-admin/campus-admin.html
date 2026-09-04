@@ -1,0 +1,185 @@
+<section class="container mx-auto px-4 py-4 h-[calc(100vh-4rem)] flex flex-col min-h-0">
+  <div class="flex items-center justify-between mb-3 shrink-0">
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl font-bold">Campus Editor</h1>
+        @if (campus(); as c) {
+        <span class="badge badge-outline badge-sm font-medium">{{ c.name }}</span>
+        }
+      </div>
+      <p class="text-xs text-base-content/60">
+        {{ accountService.currentUser()?.email }}
+      </p>
+    </div>
+
+    <div class="flex items-center gap-1.5 bg-base-200/60 p-1 rounded-full border border-base-300">
+      <button
+        type="button"
+        class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'buildings'"
+        [class.btn-ghost]="activeTab() !== 'buildings'"
+        (click)="switchTab('buildings')">
+        Buildings
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'nodes'"
+        [class.btn-ghost]="activeTab() !== 'nodes'"
+        (click)="switchTab('nodes')">
+        Nodes
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'paths'"
+        [class.btn-ghost]="activeTab() !== 'paths'"
+        (click)="switchTab('paths')">
+        Paths
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 flex-1 min-h-0">
+    <!-- Tab Views -->
+    @if (activeTab() === 'buildings') {
+    <app-campus-building [buildings]="buildings()" [selectedBuildingId]="selectedBuildingId()"
+      [isDrawing]="mode() === 'draw-building'" (startDrawing)="startDrawing()" (selectBuilding)="selectBuilding($event)"
+      (createBuilding)="handleCreateBuilding($event)" (updateBuilding)="handleUpdateBuilding($event)"
+      (deleteBuilding)="handleDeleteBuilding($event)" (addEntrance)="startEntrance($event)" />
+    }
+
+    @if (activeTab() === 'nodes') {
+    <app-campus-node [nodes]="nodes()" [isPlacingNodes]="mode() === 'place-nodes'" [selectedNodeId]="selectedNodeId()"
+      (startPlacingNodes)="startPlacingNodes()" (selectNode)="selectNode($event)"
+      (renameNode)="handleRenameNode($event)" (deleteNode)="handleDeleteNode($event)" />
+    }
+
+    @if (activeTab() === 'paths') {
+    <app-campus-paths [edges]="edges()" [nodes]="nodes()" [isConnecting]="mode() === 'connect-nodes'"
+      [isDeletingEdges]="mode() === 'delete-edges'" [selectedEdgeId]="selectedEdgeId()"
+      (startConnecting)="startConnecting()" (startDeletingEdges)="startDeletingEdges()"
+      (pathEditClick)="onPolylineDblClick($event)" (selectEdge)="selectEdge($event)" />
+    }
+
+    <!-- Persistent Map View -->
+    <div class="relative w-full h-full min-h-0">
+      <app-campus-map 
+        [polygons]="mapPolygons()" 
+        [markers]="nodeMarkers()" 
+        [polylines]="edgePolylines()"
+        [center]="campus()?.center! | toLatLngPipe"
+        (mapClick)="onMapClick($event)" 
+        (polygonClick)="selectBuilding($event)" 
+        (polygonDblClick)="onBuildingDblClick($event)"
+        (markerClick)="onMarkerClick($event)"
+        (markerDblClick)="onMarkerDblClick($event)"
+        (polylineClick)="onPolylineClick($event)"
+        (polylineDblClick)="onPolylineDblClick($event)"
+        (ready)="onMapReady($event)"  />
+
+      <!-- Drawing & Action Controls Overlay -->
+      @if (mode() === 'draw-building') {
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
+        <div class="flex items-center gap-2">
+          <span class="relative flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-warning"></span>
+          </span>
+          <span class="text-xs font-medium text-base-content">
+            {{ draftPath().length }} point(s) placed
+          </span>
+        </div>
+        <div class="divider divider-horizontal my-0 py-1"></div>
+        <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftPath().length < 3"
+          (click)="finishDrawing()">
+          Finish Shape
+        </button>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">
+          Cancel
+        </button>
+      </div>
+      }
+
+      @if (mode() === 'place-nodes') {
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+        <span class="text-xs font-medium">{{ draftNodePath().length }} point(s) — click an existing node to finish and
+          connect</span>
+        <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftNodePath().length < 2"
+          (click)="finishPlacingNodes()">Finish</button>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
+      </div>
+      }
+
+      @if (mode() === 'connect-nodes') {
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+        @if (connectFirstNodeId() === null) {
+        <span class="text-xs font-medium">Select the first node</span>
+        } @else if (connectSecondNodeId() === null) {
+        <span class="text-xs font-medium">Select the second node</span>
+        } @else {
+        <span class="text-xs font-medium">Connect these two nodes?</span>
+        <button class="btn btn-xs btn-primary rounded-full px-3" (click)="submitConnection()">Connect</button>
+        }
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
+      </div>
+      }
+
+      @if (mode() === 'delete-edges') {
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+        <span class="text-xs font-medium text-error">Delete mode: click any path to remove it instantly</span>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Done</button>
+      </div>
+      }
+
+      @if (mode() === 'place-entrance') {
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+        <span class="text-xs font-medium">Click within 5m of {{ entranceTargetBuilding()?.name }}'s boundary</span>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
+      </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- Entrance Modal -->
+<app-modal [isOpen]="isEntranceConfirmOpen()" title="Add entrance" (closed)="isEntranceConfirmOpen.set(false)">
+  <div class="space-y-4">
+    <p class="text-sm">Add an entrance node here for <span class="font-semibold">{{ entranceTargetBuilding()?.name
+        }}</span>?</p>
+    <input class="input input-bordered input-sm w-full" placeholder="Entrance name (e.g. Main Entrance)"
+      [value]="entranceName()" (input)="entranceName.set($any($event.target).value)" />
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="isEntranceConfirmOpen.set(false)">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!entranceName().trim()"
+        (click)="confirmEntrance()">Add entrance</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="isLeaveConfirmOpen()" title="Unsaved changes" (closed)="cancelLeave()">
+  <div class="space-y-4">
+    <p class="text-sm">You have unsaved work in the campus editor - leave without saving?</p>
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="cancelLeave()">Stay</button>
+      <button type="button" class="btn btn-error btn-sm text-error-content" (click)="confirmLeave()">Leave without saving</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-entity-detail-modal
+  [isOpen]="isEdgeDetailOpen()"
+  title="Edit path"
+  [name]="edgeDetailTarget()?.name ?? null"
+  namePlaceholder="e.g. Corridor, Stairs, Passage"
+  (save)="saveEdgeDetail($event)"
+  (delete)="deleteEdgeDetail()"
+  (closed)="closeEdgeDetail()"
+/>

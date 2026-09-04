@@ -1,103 +1,252 @@
-<section class="container mx-auto px-4 py-8">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold">Campus admin invitations</h1>
-    <button class="btn btn-primary btn-sm" (click)="openCreate()">New invitation</button>
+<section class="container mx-auto px-4 py-8 max-w-6xl">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-bold">Campus Admin Invitations</h1>
+        @if (pendingCount() > 0) {
+        <span class="badge badge-info badge-sm font-medium">{{ pendingCount() }} Pending</span>
+        }
+      </div>
+      <p class="text-xs text-base-content/60 mt-0.5">Invite, manage, and revoke campus administrator access passes.</p>
+    </div>
+
+    <span [title]="campuses().length === 0 ? 'All campuses currently have an assigned administrator or a pending invitation.' : null">
+      <button class="btn btn-primary btn-sm gap-2" (click)="openCreate()" [disabled]="campuses().length === 0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        New Invitation
+      </button>
+    </span>
   </div>
 
-  <div class="overflow-x-auto rounded-box border border-base-300">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Campus</th>
-          <th>Invitee</th>
-          <th>Status</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (invitation of invitations(); track invitation.invitationId) {
-          <tr>
-            <td class="font-medium">{{ invitation.campusName }}</td>
-            <td>
-              <div class="text-sm">{{ invitation.inviteeName }}</div>
-              <div class="text-xs text-base-content/60">{{ invitation.inviteeEmail }}</div>
-            </td>
-            <td>
-              @if (invitation.isAccepted) {
-                <span class="badge badge-success">Accepted</span>
-              } @else if (invitation.isRevoked) {
-                <span class="badge badge-primary">Revoked</span>
-              } @else if (invitation.isLocked) {
-                <span class="badge badge-error">Locked</span>
-              } @else if (invitation.isExpired) {
-                <span class="badge badge-warning">Expired</span>
-              } @else {
-                <span class="badge badge-info">Pending</span>
-              }
-            </td>
-            <td class="text-right">
-              @if (!invitation.isAccepted && !invitation.isRevoked) {
-                <div class="join">
-                  @if (!invitation.isExpired && !invitation.isLocked) {
-                    <button class="btn btn-sm btn-outline join-item" (click)="openDuration(invitation)">Edit</button>
-                  } @else {
-                    <button class="btn btn-sm btn-outline join-item" (click)="resend(invitation)">Resend</button>
-                  }
-                  <button class="btn btn-sm btn-outline btn-error join-item" (click)="openRevoke(invitation)">Revoke</button>
-                </div>
-              }
-            </td>
-          </tr>
-        } @empty {
-          <tr>
-            <td colspan="4" class="text-center py-6 text-base-content/60">No invitations yet.</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <span class="text-xs font-medium text-base-content/60 mr-1">Filter:</span>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-primary]="statusFilter() === 'all'"
+      [class.btn-ghost]="statusFilter() !== 'all'"
+      (click)="setFilter('all')">
+      All ({{ invitations().length }})
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-info]="statusFilter() === 'pending'"
+      [class.btn-ghost]="statusFilter() !== 'pending'"
+      (click)="setFilter('pending')">
+      Pending
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-success]="statusFilter() === 'accepted'"
+      [class.btn-ghost]="statusFilter() !== 'accepted'"
+      (click)="setFilter('accepted')">
+      Accepted
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-warning]="statusFilter() === 'expired'"
+      [class.btn-ghost]="statusFilter() !== 'expired'"
+      (click)="setFilter('expired')">
+      Expired
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-error]="statusFilter() === 'locked'"
+      [class.btn-ghost]="statusFilter() !== 'locked'"
+      (click)="setFilter('locked')">
+      Locked
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-neutral]="statusFilter() === 'declined'"
+      [class.btn-ghost]="statusFilter() !== 'declined'"
+      (click)="setFilter('declined')">
+      Declined
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-xs rounded-full"
+      [class.btn-neutral]="statusFilter() === 'revoked'"
+      [class.btn-ghost]="statusFilter() !== 'revoked'"
+      (click)="setFilter('revoked')">
+      Revoked
+    </button>
   </div>
+
+  <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 shadow-sm">
+  <table class="table table-zebra w-full">
+    <thead>
+      <tr>
+        <th>Invitee</th>
+        <th>Campus</th>
+        <th>Date Sent</th>
+        <th class="text-center">Status</th>
+        <th class="text-center">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (invitation of filteredInvitations(); track invitation.invitationId) {
+      <tr class="hover">
+        <td>
+          <div class="font-semibold text-sm">{{ invitation.inviteeName }}</div>
+          <div class="text-xs text-base-content/60 font-mono">{{ invitation.inviteeEmail }}</div>
+        </td>
+        <td>
+          <span class="font-medium text-xs">{{ invitation.campusName }}</span>
+        </td>
+        <td class="text-xs text-base-content/70">
+          {{ invitation.dateCreated | date:'mediumDate' }}
+        </td>
+        <td class="text-center">
+          @if (invitation.isAccepted) {
+          <span class="badge badge-success badge-sm gap-1">
+            <span class="h-1.5 w-1.5 rounded-full bg-success-content"></span>
+            Accepted
+          </span>
+          } @else if (invitation.isRevoked) {
+          <span class="badge badge-neutral badge-sm">Revoked</span>
+          } @else if (invitation.isRejected) {
+          <span class="badge badge-neutral badge-sm">Declined</span>
+          } @else if (invitation.isLocked) {
+          <span class="badge badge-error badge-sm">Locked</span>
+          } @else if (invitation.isExpired) {
+          <span class="badge badge-warning badge-sm">Expired</span>
+          } @else {
+          <span class="badge badge-info badge-sm">Pending</span>
+          }
+        </td>
+        <td class="text-center">
+          @if (!invitation.isAccepted && !invitation.isRevoked && !invitation.isRejected) {
+          <div class="join inline-flex">
+            @if (!invitation.isExpired && !invitation.isLocked) {
+            <button class="btn btn-xs btn-outline join-item" (click)="openDuration(invitation)" title="Adjust Duration">
+              Duration
+            </button>
+            } @else {
+            <button class="btn btn-xs btn-outline btn-warning join-item" (click)="resend(invitation)">
+              Resend
+            </button>
+            }
+            <button class="btn btn-xs btn-outline btn-error join-item" (click)="openRevoke(invitation)">
+              Revoke
+            </button>
+          </div>
+          } @else {
+          <span class="text-xs text-base-content/40 italic">No actions</span>
+          }
+        </td>
+      </tr>
+      } @empty {
+      <tr>
+        <td colspan="5" class="text-center py-12">
+          <div class="flex flex-col items-center gap-2 text-base-content/50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-40" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <p class="text-sm font-medium">No invitations match the selected filter.</p>
+            <p class="text-xs">Try selecting a different filter option above or click "New Invitation".</p>
+          </div>
+        </td>
+      </tr>
+      }
+    </tbody>
+  </table>
+</div>
 </section>
 
-<app-modal [isOpen]="isCreateOpen()" title="New invitation" (closed)="closeCreate()">
-  <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="space-y-4">
-    <app-text-input label="Invitee name" formControlName="inviteeName" [hasIcon]="false" />
-    <app-text-input label="Invitee email" type="email" formControlName="inviteeEmail" [hasIcon]="false" />
-    <app-select-input
-      label="Campus"
-      placeholder="Select a campus"
-      formControlName="campusId"
-      [options]="campusOptions()"
-    />
-    <app-text-input label="Duration (days)" type="number" formControlName="duration" [hasIcon]="false" />
+<app-modal [isOpen]="isCreateOpen()" title="New Invitation" (closed)="closeCreate()">
+  <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="space-y-4 pt-2">
+    <app-text-input label="Invitee Name" formControlName="inviteeName" [hasIcon]="false" />
+    <app-text-input label="Invitee Email" type="email" formControlName="inviteeEmail" [hasIcon]="false" [errorMessages]="{
+    required: 'Email is required.',
+    email: 'Please enter a valid email address.',
+    emailTaken: 'An account already exists with this email.',
+    emailHasPendingInvitation: 'This email already has a pending invitation elsewhere.'
+  }" />
+    <app-select-input label="Campus Assignment" placeholder="Select target campus" formControlName="campusId"
+      [options]="campusOptions()" />
+    <app-text-input label="Valid Duration (days)" type="number" formControlName="duration" [hasIcon]="false" />
 
     <div class="modal-action">
-      <button type="button" class="btn btn-ghost" (click)="closeCreate()">Cancel</button>
-      <button type="submit" class="btn btn-primary" [disabled]="createForm.invalid">Send invitation</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="closeCreate()">Cancel</button>
+      <button type="submit" class="btn btn-primary btn-sm" [disabled]="createForm.invalid || isCheckingEmail()">
+        @if (isCheckingEmail()) {
+        <span class="loading loading-spinner loading-xs"></span>
+        Checking email…
+        } @else {
+        Send Invitation
+        }
+      </button>
     </div>
   </form>
 </app-modal>
 
-<app-modal [isOpen]="isDurationOpen()" title="Edit invitation duration" (closed)="closeDuration()">
+<app-modal [isOpen]="isDurationOpen()" title="Extend Duration" (closed)="closeDuration()">
   @if (targetInvitation(); as invitation) {
-    <form [formGroup]="durationForm" (ngSubmit)="submitDuration()" class="space-y-4">
-      <p class="text-sm text-base-content/70">{{ invitation.inviteeName }} — {{ invitation.campusName }}</p>
-      <app-text-input label="Duration (days)" type="number" formControlName="duration" [hasIcon]="false" />
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost" (click)="closeDuration()">Cancel</button>
-        <button type="submit" class="btn btn-primary" [disabled]="durationForm.invalid">Save changes</button>
+  <div class="space-y-4 pt-2">
+    <div class="rounded-box bg-base-200/50 p-3 text-xs space-y-1">
+      <div class="font-medium text-base-content">{{ invitation.inviteeName }}</div>
+      <div class="text-base-content/60">{{ invitation.inviteeEmail }} • {{ invitation.campusName }}</div>
+    </div>
+
+    <div class="rounded-box border border-base-300 bg-base-100 p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Duration</span>
+        <span class="text-xs text-base-content/50">Current: {{ invitation.duration }} day(s)</span>
       </div>
-    </form>
+
+      <div class="flex items-center justify-center gap-4">
+        <span class="text-3xl font-bold tabular-nums">{{ durationDraft() }}</span>
+        <span class="text-sm text-base-content/60">day(s)</span>
+        <button type="button" class="btn btn-circle btn-sm btn-primary" (click)="incrementDuration()">+</button>
+      </div>
+
+      <div class="text-center text-xs text-base-content/60 pt-2 border-t border-base-200">
+        Expires in <span class="font-semibold text-primary">{{ expiresInDays() }}</span> day(s) from today
+      </div>
+    </div>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="closeDuration()">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="durationDraft() <= invitation.duration" (click)="submitDuration()">
+        Save Changes
+      </button>
+    </div>
+  </div>
   }
 </app-modal>
 
-<app-modal [isOpen]="isRevokeOpen()" title="Revoke invitation" (closed)="closeRevoke()">
+<app-modal [isOpen]="isRevokeOpen()" title="Revoke Invitation" (closed)="closeRevoke()">
   @if (targetInvitation(); as invitation) {
-    <div class="space-y-4">
-      <p class="text-sm">Revoke the invitation for <span class="font-semibold">{{ invitation.inviteeName }}</span> ({{ invitation.campusName }})?</p>
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost" (click)="closeRevoke()">Cancel</button>
-        <button type="button" class="btn btn-error text-error-content" (click)="confirmRevoke()">Revoke</button>
-      </div>
+  <div class="space-y-4 pt-2">
+    <p class="text-sm text-base-content/80 leading-relaxed">
+      Are you sure you want to revoke the campus invitation for
+      <span class="font-semibold text-base-content">{{ invitation.inviteeName }}</span>?
+      They will no longer be able to use this link to complete setup.
+    </p>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="closeRevoke()">Cancel</button>
+      <button type="button" class="btn btn-error btn-sm text-white" (click)="confirmRevoke()">
+        Revoke Invitation
+      </button>
     </div>
+  </div>
   }
 </app-modal>

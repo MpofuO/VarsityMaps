@@ -7,6 +7,7 @@
         <tr>
           <th>Name</th>
           <th>Alias</th>
+          <th>Campuses</th>
           <th></th>
         </tr>
       </thead>
@@ -15,13 +16,14 @@
         <tr>
           <td class="font-medium">{{ university.name }}</td>
           <td><span class="badge badge-ghost">{{ university.alias }}</span></td>
+          <td><span class="badge badge-ghost">{{ university.campusCount ?? 0 }}</span></td>
           <td class="text-right">
             <button class="btn btn-sm btn-outline btn-primary" (click)="openDetail(university)">View details</button>
           </td>
         </tr>
         } @empty {
         <tr>
-          <td colspan="3" class="text-center py-6 text-base-content/60">No universities yet.</td>
+          <td colspan="4" class="text-center py-6 text-base-content/60">No universities yet.</td>
         </tr>
         }
       </tbody>

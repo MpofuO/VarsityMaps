@@ -37,7 +37,8 @@ builder.Services.AddIdentityCore<AppUser>(options =>
     options.User.RequireUniqueEmail = true;
 })
 .AddRoles<IdentityRole>()
-.AddEntityFrameworkStores<AppDbContext>();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -58,6 +59,7 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("RequireUniversityAdminRole", policy => policy.RequireRole("UniversityAdmin"))
     .AddPolicy("RequireCampusAdminRole", policy => policy.RequireRole("CampusAdmin"))
     .AddPolicy("RequireStandardUserRole", policy => policy.RequireRole("StandardUser"))
+    .AddPolicy("RequireUniversityAdminOrCampusAdminRole", policy => policy.RequireRole("UniversityAdmin", "CampusAdmin"))
     .AddPolicy("RequireCampusAdminOrStandardUserRole", policy => policy.RequireRole("CampusAdmin", "StandardUser"));;
 
 var app = builder.Build();

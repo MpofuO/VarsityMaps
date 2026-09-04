@@ -19,7 +19,7 @@
             type="email"
             placeholder="student@ufs4life.ac.za"
             formControlName="email"
-            [errorMessages]="{ required: 'Email is required.', email: 'Please enter a valid email address.' }"
+            [errorMessages]="{ required: 'Email is required.', email: 'Please enter a valid email address.', emailTaken: 'This email is already registered.' }"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current text-base-content/40 absolute left-3.5 top-1/2 -translate-y-1/2" viewBox="0 0 24 24">
               <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
@@ -71,11 +71,16 @@
             />
           </div>
 
-          <button class="btn btn-primary w-full mt-6 shadow-sm" type="submit" [disabled]="accountForm.invalid">
-            Continue to Verification
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
-            </svg>
+          <button class="btn btn-primary w-full mt-6 shadow-sm" type="submit" [disabled]="accountForm.invalid || isCheckingEmail()">
+            @if (isCheckingEmail()) {
+              <span class="loading loading-spinner loading-xs"></span>
+              Checking email…
+            } @else {
+              Continue to Verification
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+            }
           </button>
         </form>
       } @else {

@@ -22,6 +22,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     {
         base.OnModelCreating(builder);
 
+        builder.Entity<AppUser>().HasQueryFilter(x => !x.IsDeleted);
+
         builder.Entity<University>().ToTable("University");
         builder.Entity<Campus>().ToTable("Campus");
         builder.Entity<Building>().ToTable("Building");

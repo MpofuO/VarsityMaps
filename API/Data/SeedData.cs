@@ -112,7 +112,10 @@ public static class SeedData
         UserManager<AppUser> userManager, string email, string password,
         string role, int universityId, int? campusId)
     {
-        if (await userManager.FindByEmailAsync(email) is not null)
+        if (await userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(user=>user.Email!.ToLower() == email.ToUpper())
+                is not null)
             return;
 
         var user = new AppUser

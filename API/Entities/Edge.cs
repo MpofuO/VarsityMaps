@@ -4,6 +4,7 @@ public class Edge
 {
     public int EdgeId { get; set; }
     public decimal Weight { get; set; }
+    public string? Name { get; set; }
     public int CampusId { get; set; }
     
     public int FromNodeId { get; set; }

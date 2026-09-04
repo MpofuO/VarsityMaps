@@ -3,9 +3,11 @@ export interface Invitation {
   inviteeEmail: string;
   inviteeName: string;
   isAccepted: boolean;
+  isRejected: boolean;
   isRevoked: boolean;
   isExpired: boolean;
   isLocked: boolean;
+  dateCreated: string;
   duration: number;
   campusId: number;
   campusName: string;

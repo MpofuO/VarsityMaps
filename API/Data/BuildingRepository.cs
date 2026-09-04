@@ -17,11 +17,23 @@ public class BuildingRepository : BaseRepository<Building>, IBuildingRepository
             .ToListAsync();
     }
 
+    public async Task<Building?> GetByAliasAsync(int campusId, string alias)
+    {
+        return await context.Buildings
+            .FirstOrDefaultAsync(b => b.CampusId == campusId && b.Alias == alias);
+    }
+
     public async Task<IEnumerable<Building>> GetByCampusAsync(int campusId)
     {
         return await context.Buildings
             .Where(b => b.CampusId == campusId)
             .ToListAsync();
+    }
+
+    public async Task<Building?> GetByNameAsync(int campusId, string name)
+    {
+        return await context.Buildings
+            .FirstOrDefaultAsync(b => b.CampusId == campusId && b.Name == name);
     }
 
     public async Task<IEnumerable<Building>> GetGuestAccessibleAsync(int campusId)
