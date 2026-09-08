@@ -60,13 +60,14 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
         }
 
         var (user, isNew) = await GetUserByEmailFromAll(registerDto.Email);
+        var wasDeleted = user.IsDeleted;
+
+        if (!isNew && !wasDeleted) return BadRequest("This email is already in use.");
 
         user.UniversityId = registerDto.UniversityId;
         user.CampusId = registerDto.CampusId;
         user.IsActive = true;
         user.IsDeleted = false;
-
-        if (!isNew && !user.IsDeleted) return BadRequest("This email is already in use.");
 
         if (isNew)
         {
@@ -148,13 +149,14 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
         if (campus is null) return BadRequest("Associated campus not found.");
 
         var (user, isNew) = await GetUserByEmailFromAll(invitation.InviteeEmail);
+        var wasDeleted = user.IsDeleted;
+
+        if (!isNew && !wasDeleted) return BadRequest("This email is already in use.");
 
         user.UniversityId = campus.UniversityId;
         user.CampusId = campus.CampusId;
         user.IsActive = true;
         user.IsDeleted = false;
-
-        if (!isNew && !user.IsDeleted) return BadRequest("This email is already in use.");
 
         if (isNew)
         {
@@ -194,10 +196,46 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
     [Authorize]
     public async Task<ActionResult<UniversityDto>> GetMyUniversity()
     {
-        var universityId = await User.GetUniversityIdAsync(userManager);
+        var universityId = await User.GetActiveUniversityIdAsync(userManager, User.IsInRole("StandardUser"));
         var university = await uow.UniversityRepository.GetByIdAsync(universityId);
         if (university is null) return NotFound();
         return Ok(university.ToDto());
+    }
+
+    [HttpPost("switch-campus")]
+    [Authorize(Policy = "RequireStandardUserRole")]
+    public async Task<IActionResult> SwitchCampus([FromBody] int campusId)
+    {
+        var user = await userManager.FindByNameAsync(User?.Identity?.Name!);
+        if (user is null) return BadRequest();
+
+        var campus = await uow.CampusRepository.GetByIdAsync(campusId);
+        if (campus is null) return BadRequest("Campus not found");
+
+        user.CurrentUniversityId = campus.UniversityId;
+        user.CampusId = campusId;
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded) return BadRequest("Failed to switch campus");
+
+        return Ok(await user.ToDto(tokenService));
+    }
+
+    [HttpPost("switch-institution")]
+    [Authorize(Policy = "RequireStandardUserRole")]
+    public async Task<IActionResult> SwitchInstitution([FromBody] int universityId)
+    {
+        var user = await userManager.FindByNameAsync(User?.Identity?.Name!);
+        if (user is null) return BadRequest();
+
+        var university = await uow.UniversityRepository.GetWithCampusesAsync(universityId);
+        if (university is null) return BadRequest("University not found");
+
+        user.CurrentUniversityId = universityId;
+        user.CampusId = university.Campuses.FirstOrDefault()?.CampusId;
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded) return BadRequest("Failed to switch institution");
+
+        return Ok(await user.ToDto(tokenService));
     }
 
     [HttpPost("logout")]

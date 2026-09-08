@@ -2,10 +2,10 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AccountService, SystemAdminRole } from '../../core/services/account-service';
 import { ThemeService } from '../../core/services/theme-service';
-import { UniversityService } from '../../core/services/university-service';
 import { roleHomeRoute } from '../../core/functions/role-home';
 import { roleNavLinks } from '../../core/functions/role-nav-links';
 import { BusyService } from '../../core/services/busy-service';
+import { NavModalService } from '../../core/services/nav-modal-service';
 
 @Component({
   selector: 'app-nav',
@@ -18,14 +18,15 @@ export class Nav {
   protected readonly accountService = inject(AccountService);
   protected readonly themeService = inject(ThemeService);
   protected readonly busyService = inject(BusyService);
+  protected readonly navService = inject(NavModalService);
   private readonly router = inject(Router);
+
+  protected readonly universityName = signal<string | null>(null);
 
   protected readonly navLinks = computed(() => {
     const role = this.accountService.currentUser()?.roles?.[0];
     return role ? roleNavLinks(role) : [];
   });
-
-  protected readonly universityName = signal<string | null>(null);
 
   constructor() {
     effect(() => {

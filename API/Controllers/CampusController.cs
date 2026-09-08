@@ -11,7 +11,7 @@ namespace API.Controllers;
 // CampusController.cs
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "RequireUniversityAdminOrCampusAdminRole")]
+[Authorize]
 public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
 {
     [HttpGet]

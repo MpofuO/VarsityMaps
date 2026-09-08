@@ -125,6 +125,7 @@ public static class SeedData
             EmailConfirmed = true,
             IsActive = true,
             UniversityId = universityId,
+            CurrentUniversityId = universityId,
             CampusId = campusId
         };
 

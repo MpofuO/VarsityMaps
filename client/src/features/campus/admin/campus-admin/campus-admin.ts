@@ -76,7 +76,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #region Unloading Unsaved
   protected readonly isLeaveConfirmOpen = signal(false);
   private leaveConfirmSubject: Subject<boolean> | null = null;
-  hasUnsavedWork = computed(()=>{
+  hasUnsavedWork = computed(() => {
     return this.mode() === 'draw-building' || this.mode() === 'place-nodes' || this.mode() === 'connect-nodes';
   })
 
@@ -115,7 +115,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #region Buildings Properties
   protected readonly selectedBuildingId = signal<number | null>(null);
   protected readonly draftPath = signal<google.maps.LatLngLiteral[]>([]);
-  private draftPolygon?: google.maps.Polygon;
+  private draftBoundaryLine?: google.maps.Polyline;
   // #endregion
 
 
@@ -251,8 +251,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   cancelMode(): void {
     this.mode.set('view');
     this.draftPath.set([]);
-    this.draftPolygon?.setMap(null);
-    this.draftPolygon = undefined;
+    this.draftBoundaryLine?.setMap(null);
+    this.draftBoundaryLine = undefined;
     this.draftNodePath.set([]);
     this.draftPolyline?.setMap(null);
     this.draftPolyline = undefined;
@@ -282,7 +282,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       }
       const nextPath = [...path, point];
       this.draftPath.set(nextPath);
-      this.renderDraftPolygon(nextPath);
+      this.renderDraftBoundary(nextPath);
       return;
     }
 
@@ -442,19 +442,19 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     }
   }
 
-  private renderDraftPolygon(path: google.maps.LatLngLiteral[]): void {
+  private renderDraftBoundary(path: google.maps.LatLngLiteral[]): void {
     if (!this.map) return;
-    if (!this.draftPolygon) {
-      this.draftPolygon = new google.maps.Polygon({
+
+    if (!this.draftBoundaryLine) {
+      this.draftBoundaryLine = new google.maps.Polyline({
         map: this.map,
-        paths: [path],
-        strokeColor: '#f97316',
-        strokeWeight: 2,
-        fillColor: '#f97316',
-        fillOpacity: 0.25
+        path,
+        strokeColor: '#7c3aed',
+        strokeWeight: 3,
+        strokeOpacity: 0.9
       });
     } else {
-      this.draftPolygon.setPath(path);
+      this.draftBoundaryLine.setPath(path);
     }
   }
 

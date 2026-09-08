@@ -18,7 +18,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     [HttpGet]
     public async Task<ActionResult<IEnumerable<EdgeDto>>> GetEdges()
     {
-        var campusId = await User.GetCampusIdAsync(userManager);
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
         var edges = await uow.EdgeRepository.GetByCampusAsync(campusId);
         return Ok(edges.Select(e => e.ToDto()));
     }
@@ -30,7 +30,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
 
         var fromNode = await uow.NodeRepository.GetByIdAsync(fromNodeId);
         var toNode = await uow.NodeRepository.GetByIdAsync(toNodeId);
-        var campusId = await User.GetCampusIdAsync(userManager);
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
 
         if (fromNode is null || toNode is null || fromNode.CampusId != campusId || toNode.CampusId != campusId)
             return BadRequest("One or both nodes not found.");
@@ -65,7 +65,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var edge = await uow.EdgeRepository.GetByIdAsync(edgeId);
         if (edge is null) return NotFound();
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (edge.CampusId != callerCampusId) return NotFound();
 
         edge.Name = renameDto.Name;

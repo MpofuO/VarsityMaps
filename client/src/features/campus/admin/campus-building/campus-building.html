@@ -27,12 +27,13 @@
           <p class="text-sm font-medium truncate leading-snug">{{ building.name }}</p>
           <div class="flex items-center gap-1 mt-0.5">
             <span class="badge badge-ghost badge-xs">{{ building.alias }}</span>
-            @if (building.isAccessible) {
-              <span class="badge badge-success badge-xs opacity-80">Accessible</span>
-            }
-            @if (building.isGuestAccessible) {
-              <span class="badge badge-info badge-xs opacity-80">Guest Accessible</span>
-            }
+              @if (building.isAccessible) {
+                <span class="badge badge-success badge-xs opacity-80">Accessible</span>
+              }
+              @if (building.isGuestAccessible) {
+                <span class="badge badge-info badge-xs opacity-80">Guest</span>
+              }
+
           </div>
         </div>
 

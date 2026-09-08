@@ -4,7 +4,7 @@
       <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-content shadow-sm">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 24 24">
           <path
-            d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+            d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5-2.5z" />
         </svg>
       </div>
       <span class="tracking-tight">Varsity<span class="text-primary">Maps</span></span>
@@ -23,12 +23,12 @@
     </ul>
     }
 
-    @if(busyService.busyCount()>0) {
+    @if(busyService.busyCount() > 0) {
     <span class="mr-2 loading loading-spinner"></span>
     }
   </div>
 
-  <div class="flex-1 flex justify-center">
+  <div class="flex-1 flex justify-center gap-2 items-center">
     @if (universityName(); as name) {
     <span class="badge badge-ghost badge-xl gap-1.5 md:inline-flex">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-current opacity-60" viewBox="0 0 24 24">
@@ -36,6 +36,10 @@
       </svg>
       {{ name }}
     </span>
+    }
+
+    @if (accountService.currentUser()?.isVisitor) {
+    <span class="badge badge-warning badge-sm">Visitor</span>
     }
   </div>
 
@@ -77,12 +81,26 @@
         </svg>
       </div>
       <ul tabindex="0"
-        class="menu dropdown-content z-50 mt-2 w-56 rounded-box bg-base-100 p-2 shadow-lg border border-base-200 text-sm">
+        class="menu dropdown-content z-50 mt-2 w-56 rounded-box bg-base-100 p-2 shadow-lg border border-base-200 text-sm space-y-1">
         <li class="menu-title px-3 py-1 text-xs text-base-content/50">Signed in as</li>
         <li class="px-3 pb-2 pt-0 font-medium truncate text-xs border-b border-base-200">
           {{ accountService.currentUser()?.email }}
         </li>
-        <li class="mt-2">
+
+        @if (navService.isStandardUser()) {
+        <li>
+          <button class="hover:bg-base-200" (click)="navService.openSwitchCampus()">
+            Switch Campus
+          </button>
+        </li>
+        <li>
+          <button class="hover:bg-base-200" (click)="navService.openSwitchInstitution()">
+            Switch Institution
+          </button>
+        </li>
+        }
+
+        <li class="pt-1 border-t border-base-200">
           <button class="text-error hover:bg-error/10" (click)="logout()">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 fill-current" viewBox="0 0 24 24">
               <path

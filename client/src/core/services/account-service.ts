@@ -63,6 +63,20 @@ export class AccountService extends BaseService {
     );
   }
 
+  switchCampus(campusId: number) {
+    return this.http.post<User>(`${this.apiUrl}/account/switch-campus`, campusId).pipe(
+      tap((user) => this.setAuthenticatedUser(user)),
+      catchError((error: HttpErrorResponse) => throwError(() => error))
+    );
+  }
+
+  switchInstitution(universityId: number) {
+    return this.http.post<User>(`${this.apiUrl}/account/switch-institution`, universityId).pipe(
+      tap((user) => this.setAuthenticatedUser(user)),
+      catchError((error: HttpErrorResponse) => throwError(() => error))
+    );
+  }
+
   getMyUniversity() {
     return this.http.get<University>(`${this.apiUrl}/account/my-university`);
   }
@@ -74,7 +88,7 @@ export class AccountService extends BaseService {
   private setAuthenticatedUser(user: User): User {
     const authenticatedUser: User = {
       ...user,
-      roles: this.extractRoles(user)
+      roles: user.roles?.length ? user.roles : this.extractRoles(user)
     };
     this.currentUser.set(authenticatedUser);
     window.localStorage.setItem(this.storageKey, JSON.stringify(authenticatedUser));

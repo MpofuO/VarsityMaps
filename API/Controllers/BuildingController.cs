@@ -17,7 +17,11 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
     [Authorize(Policy = "RequireCampusAdminOrStandardUserRole")]
     public async Task<ActionResult<IEnumerable<BuildingDto>>> GetBuildings()
     {
-        var buildings = await uow.BuildingRepository.GetByCampusAsync(await User.GetCampusIdAsync(userManager));
+        var (campusId, isGuest) = await User.GetCampusIdAsync(userManager);
+        var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
+
+        if (isGuest) buildings = buildings.Where(b => b.IsGuestAccessible);
+
         return Ok(buildings.Select(b => b.ToDto()));
     }
 
@@ -28,7 +32,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         var building = await uow.BuildingRepository.GetWithEntrancesAsync(id);
         if (building is null) return NotFound();
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (building.CampusId != callerCampusId) return NotFound();
 
         return Ok(building.ToDto());
@@ -40,7 +44,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var campusId = await User.GetCampusIdAsync(userManager);
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
 
         var existingBuilding = await uow.BuildingRepository.GetByNameAsync(campusId, buildingDto.Name);
         if (existingBuilding is not null) return BadRequest("A building with this name already exists.");
@@ -56,7 +60,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         {
             Name = buildingDto.Name,
             Alias = buildingDto.Alias,
-            IsAccessible = buildingDto.IsAccessible,
+            IsAccessible = buildingDto.IsGuestAccessible ? true : buildingDto.IsAccessible,
             IsGuestAccessible = buildingDto.IsGuestAccessible,
             Boundary = buildingDto.Boundary,
             CampusId = campusId
@@ -76,18 +80,19 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         var building = await uow.BuildingRepository.GetByIdAsync(buildingId);
         if (building is null) return NotFound();
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (building.CampusId != callerCampusId) return NotFound();
 
         var existingBuilding = await uow.BuildingRepository.GetByNameAsync(callerCampusId, buildingDto.Name);
-        if (existingBuilding is not null) return BadRequest("A building with this name already exists.");
+        if (existingBuilding != null && existingBuilding.BuildingId != building.BuildingId)
+            return BadRequest("A building with this name already exists.");
 
         existingBuilding = await uow.BuildingRepository.GetByAliasAsync(callerCampusId, buildingDto.Alias);
-        if (existingBuilding is not null) return BadRequest("A building with this alias already exists.");
+        if (existingBuilding != null && existingBuilding.BuildingId != building.BuildingId) return BadRequest("A building with this alias already exists.");
 
         building.Name = buildingDto.Name;
         building.Alias = buildingDto.Alias;
-        building.IsAccessible = buildingDto.IsAccessible;
+        building.IsAccessible = buildingDto.IsGuestAccessible ? true : buildingDto.IsAccessible;
         building.IsGuestAccessible = buildingDto.IsGuestAccessible;
 
         await uow.BuildingRepository.UpdateAsync(building);
@@ -102,7 +107,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         var building = await uow.BuildingRepository.GetWithEntrancesAsync(buildingId);
         if (building is null) return NotFound();
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (building.CampusId != callerCampusId) return NotFound();
 
         foreach (Node entrance in building.Entrances)

@@ -18,7 +18,8 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     [HttpGet]
     public async Task<ActionResult<IEnumerable<NodeDto>>> GetNodes()
     {
-        var nodes = await uow.NodeRepository.GetByCampusAsync(await User.GetCampusIdAsync(userManager));
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
+        var nodes = await uow.NodeRepository.GetByCampusAsync(campusId);
         return Ok(nodes.Select(n => n.ToDto()).ToList());
     }
 
@@ -27,7 +28,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
 
         var building = await uow.BuildingRepository.GetByIdAsync(buildingId);
         if (building is null) return NotFound("Building not found.");
@@ -60,7 +61,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         if (!ModelState.IsValid) return BadRequest(ModelState);
         if (dto.Nodes.Count < 2) return BadRequest("At least two nodes are required.");
 
-        var campusId = await User.GetCampusIdAsync(userManager);
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
 
         var points = new List<Point>();
         foreach (var item in dto.Nodes)
@@ -126,7 +127,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var node = await uow.NodeRepository.GetByIdAsync(nodeId);
         if (node is null) return NotFound();
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (node.CampusId != callerCampusId) return NotFound();
 
         node.Name = renameDto.Name;
@@ -141,7 +142,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var node = await uow.NodeRepository.GetByIdAsync(nodeId);
         if (node is null) return NotFound();
 
-        var callerCampusId = await User.GetCampusIdAsync(userManager);
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (node.CampusId != callerCampusId) return NotFound();
 
         var edges = await uow.EdgeRepository.GetByNodeAsync(nodeId);

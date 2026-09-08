@@ -13,3 +13,55 @@
     </aside>
   </footer>
 </div>
+
+<app-modal [isOpen]="navModalService.isSwitchCampusOpen()" title="Switch Campus" (closed)="navModalService.closeSwitchCampus()">
+  <div class="space-y-3">
+    <input
+      type="text"
+      class="input input-bordered input-sm w-full"
+      placeholder="Search campuses…"
+      [value]="navModalService.campusSearchQuery()"
+      (input)="navModalService.campusSearchQuery.set($any($event.target).value)"
+    />
+
+    <div class="max-h-64 overflow-y-auto space-y-1">
+      @for (campus of navModalService.filteredCampusOptions(); track campus.campusId) {
+        <div
+          class="rounded-btn px-3 py-2 text-sm cursor-pointer hover:bg-base-200 flex items-center justify-between"
+          (click)="navModalService.selectCampus(campus)"
+        >
+          <span>{{ campus.name }}</span>
+          <span class="badge badge-ghost badge-xs">{{ campus.alias }}</span>
+        </div>
+      } @empty {
+        <div class="text-sm text-base-content/50 py-6 text-center">No other campuses match your search.</div>
+      }
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="navModalService.isSwitchInstitutionOpen()" title="Switch Institution" (closed)="navModalService.closeSwitchInstitution()">
+  <div class="space-y-3">
+    <input
+      type="text"
+      class="input input-bordered input-sm w-full"
+      placeholder="Search institutions…"
+      [value]="navModalService.institutionSearchQuery()"
+      (input)="navModalService.institutionSearchQuery.set($any($event.target).value)"
+    />
+
+    <div class="max-h-64 overflow-y-auto space-y-1">
+      @for (university of navModalService.filteredInstitutionOptions(); track university.universityId) {
+        <div
+          class="rounded-btn px-3 py-2 text-sm cursor-pointer hover:bg-base-200 flex items-center justify-between"
+          (click)="navModalService.selectInstitution(university)"
+        >
+          <span>{{ university.name }}</span>
+          <span class="badge badge-ghost badge-xs">{{ university.alias }}</span>
+        </div>
+      } @empty {
+        <div class="text-sm text-base-content/50 py-6 text-center">No other institutions match your search.</div>
+      }
+    </div>
+  </div>
+</app-modal>
