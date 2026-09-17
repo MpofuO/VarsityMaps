@@ -4,10 +4,70 @@
       <h1 class="text-xl font-bold">{{ campusName() || 'Campus Map' }}</h1>
       <p class="text-xs text-base-content/60">{{ accountService.currentUser()?.email }}</p>
     </div>
+
+    @if (!isPlanningRoute()) {
+      <button class="btn btn-primary btn-sm" (click)="startPlanningRoute()">Get Directions</button>
+    }
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 flex-1 min-h-0">
     <div class="rounded-box border border-base-300 bg-base-100 p-3 flex flex-col min-h-0 shadow-sm">
+
+      @if (isPlanningRoute()) {
+        <div class="space-y-2 mb-3 shrink-0">
+          <button
+            class="btn btn-sm w-full justify-start"
+            [class.btn-outline]="activePickField() !== 'origin'"
+            [class.btn-primary]="activePickField() === 'origin'"
+            (click)="pickField('origin')"
+          >
+            <span class="text-xs opacity-70 mr-1">From:</span>
+            {{ originBuilding()?.name || 'Tap to choose' }}
+          </button>
+
+          <button
+            class="btn btn-sm w-full justify-start"
+            [class.btn-outline]="activePickField() !== 'destination'"
+            [class.btn-primary]="activePickField() === 'destination'"
+            (click)="pickField('destination')"
+          >
+            <span class="text-xs opacity-70 mr-1">To:</span>
+            {{ destinationBuilding()?.name || 'Tap to choose' }}
+          </button>
+
+          @if (activePickField()) {
+            <div class="text-xs text-center text-base-content/60 italic">
+              Select a {{ activePickField() }} building from the map or list below
+            </div>
+          }
+
+          @if (originBuildingId() && destinationBuildingId() && !route()) {
+            <button class="btn btn-success btn-sm w-full text-success-content" [disabled]="isCalculatingRoute()" (click)="calculateRoute()">
+              @if (isCalculatingRoute()) {
+                <span class="loading loading-spinner loading-xs"></span>
+              }
+              Calculate Route
+            </button>
+          }
+
+          @if (route(); as r) {
+            <div class="rounded-btn bg-success/10 border border-success/30 p-3 space-y-1">
+              <div class="flex justify-between text-sm">
+                <span class="text-base-content/60">Distance</span>
+                <span class="font-semibold">{{ r.distanceMeters | number:'1.0-0' }} m</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-base-content/60">Est. walking time</span>
+                <span class="font-semibold">{{ r.estimatedWalkingTimeMinutes }} min</span>
+              </div>
+            </div>
+          }
+
+          <button class="btn btn-ghost btn-sm w-full" (click)="cancelPlanningRoute()">Cancel</button>
+        </div>
+        <div class="divider my-0"></div>
+      }
+
       <label class="input input-bordered input-sm flex items-center gap-2 mb-3 shrink-0">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -21,16 +81,18 @@
         />
       </label>
 
-      @if (selectedBuilding(); as building) {
-        <div class="rounded-btn border border-primary bg-primary/5 p-3 mb-3 shrink-0 space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="font-semibold text-sm">{{ building.name }}</span>
-            <span class="badge badge-ghost badge-xs">{{ building.alias }}</span>
+      @if (!isPlanningRoute() && selectedBuilding(); as building) {
+        @if(building.name.toLowerCase().includes(searchQuery().toLowerCase())){
+          <div class="rounded-btn border border-primary bg-primary/5 p-3 mb-3 shrink-0 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-sm">{{ building.name }}</span>
+              <span class="badge badge-ghost badge-xs">{{ building.alias }}</span>
+            </div>
+            @if (building.isAccessible) {
+              <span class="badge badge-success badge-xs">Accessible</span>
+            }
           </div>
-          @if (building.isAccessible) {
-            <span class="badge badge-success badge-xs">Accessible</span>
-          }
-        </div>
+        }
       }
 
       <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 px-1">
@@ -41,7 +103,7 @@
         @for (building of filteredBuildings(); track building.buildingId) {
           <div
             class="flex items-center justify-between rounded-btn px-2 py-1.5 cursor-pointer text-sm transition-colors"
-            [class.bg-primary/10]="building.buildingId === selectedBuildingId()"
+            [class.bg-primary/10]="building.buildingId === selectedBuildingId() || building.buildingId === originBuildingId() || building.buildingId === destinationBuildingId()"
             [class.hover:bg-base-200]="building.buildingId !== selectedBuildingId()"
             (click)="selectBuilding(building.buildingId)"
           >
@@ -63,6 +125,7 @@
     <div class="relative w-full h-full min-h-0">
       <app-campus-map
         [polygons]="mapPolygons()"
+        [polylines]="routePolylines()"
         [center]="campusCenter()"
         (polygonClick)="selectBuilding($event)"
         (ready)="onMapReady($event)"

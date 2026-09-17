@@ -1,6 +1,6 @@
-using System;
 using API.DTOs;
 using API.Entities;
+using Route = API.Entities.Route;
 
 namespace API.Extensions;
 
@@ -94,6 +94,22 @@ public static class DtoExtensions
             ToNodeId = edge.ToNodeId,
             Weight = edge.Weight,
             Name = edge.Name
+        };
+    }
+
+    public static RouteDto ToDto(this Route route)
+    {
+        const double averageWalkingSpeedMetersPerSecond = 1.4;
+        var estimatedMinutes = (double)route.Weight / averageWalkingSpeedMetersPerSecond / 60.0;
+
+        return new RouteDto
+        {
+            RouteId = route.RouteId,
+            Path = route.Path,
+            DistanceMeters = route.Weight,
+            EstimatedWalkingTimeMinutes = Math.Max(1, (int)Math.Round(estimatedMinutes)),
+            FromBuildingId = route.FromBuildingId,
+            ToBuildingId = route.ToBuildingId
         };
     }
 }
