@@ -93,7 +93,11 @@ public static class DtoExtensions
             FromNodeId = edge.FromNodeId,
             ToNodeId = edge.ToNodeId,
             Weight = edge.Weight,
-            Name = edge.Name
+            Name = edge.Name,
+            IsClosed = edge.IsClosed,
+            ClosedUntil = edge.ClosedUntil,
+            IsEffectivelyClosed = edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow),
+            TravelModes = edge.TravelModes
         };
     }
 
@@ -109,7 +113,8 @@ public static class DtoExtensions
             DistanceMeters = route.Weight,
             EstimatedWalkingTimeMinutes = Math.Max(1, (int)Math.Round(estimatedMinutes)),
             FromBuildingId = route.FromBuildingId,
-            ToBuildingId = route.ToBuildingId
+            ToBuildingId = route.ToBuildingId,
+            TravelMode = route.TravelMode
         };
     }
 }

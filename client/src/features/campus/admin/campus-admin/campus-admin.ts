@@ -10,7 +10,7 @@ import { CampusBuilding } from '../campus-building/campus-building';
 import { Campus } from '../../../../types/campus';
 import { Building, BuildingModel } from '../../../../types/building';
 import { Node } from '../../../../types/node';
-import { Edge } from '../../../../types/edge';
+import { Edge, TravelMode } from '../../../../types/edge';
 import { CampusMap } from '../../../../shared/map/campus-map/campus-map';
 import { MapMarker, MapPolyline } from '../../../../types/map';
 import { Modal } from '../../../../shared/modal/modal';
@@ -18,12 +18,11 @@ import { ToLatLngPipe } from '../../../../core/pipes/to-lat-lng-pipe';
 import { CampusNode } from '../campus-node/campus-node';
 import { CampusPaths } from '../campus-path/campus-path';
 import { isPointInPolygon, toGeoPolygon } from '../../../../core/functions/geography';
-import { EntityDetailModal } from '../../../../shared/entity-detail-modal/entity-detail-modal';
 import { CanComponentDeactivate } from '../../../../core/guards/unsaved-changes-guard';
 import { Observable, Subject, take } from 'rxjs';
 // #endregion
 
-type EditorMode = 'view' | 'draw-building' | 'place-nodes' | 'place-entrance' | 'connect-nodes' | 'delete-edges';
+type EditorMode = 'view' | 'draw-building' | 'place-nodes' | 'place-entrance' | 'connect-nodes' | 'select-edges';
 type EditorTab = 'buildings' | 'nodes' | 'paths';
 
 @Component({
@@ -35,8 +34,7 @@ type EditorTab = 'buildings' | 'nodes' | 'paths';
     ToLatLngPipe,
     CampusBuilding,
     CampusNode,
-    CampusPaths,
-    EntityDetailModal
+    CampusPaths
   ],
   templateUrl: './campus-admin.html',
   styleUrl: './campus-admin.css'
@@ -48,7 +46,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   private map?: google.maps.Map;
   // #endregion
 
-
   // #region Injected Services
   private readonly buildingService = inject(BuildingService);
   private readonly campusService = inject(CampusService);
@@ -58,7 +55,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly accountService = inject(AccountService);
   // #endregion
 
-
   // #region Campus & Loaded Data Properties
   protected readonly campus = signal<Campus | null>(null);
   protected readonly buildings = signal<Building[]>([]);
@@ -66,23 +62,20 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly edges = signal<Edge[]>([]);
   // #endregion
 
-
   // #region Editor Mode & Tabs Properties
   protected readonly activeTab = signal<EditorTab>('buildings');
   protected readonly mode = signal<EditorMode>('view');
   // #endregion
-
 
   // #region Unloading Unsaved
   protected readonly isLeaveConfirmOpen = signal(false);
   private leaveConfirmSubject: Subject<boolean> | null = null;
   hasUnsavedWork = computed(() => {
     return this.mode() === 'draw-building' || this.mode() === 'place-nodes' || this.mode() === 'connect-nodes';
-  })
+  });
 
   canDeactivate(): boolean | Observable<boolean> {
-    if (!this.hasUnsavedWork())
-      return true;
+    if (!this.hasUnsavedWork()) return true;
 
     this.leaveConfirmSubject = new Subject<boolean>();
     this.isLeaveConfirmOpen.set(true);
@@ -111,13 +104,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
   // #endregion
 
-
   // #region Buildings Properties
   protected readonly selectedBuildingId = signal<number | null>(null);
   protected readonly draftPath = signal<google.maps.LatLngLiteral[]>([]);
   private draftBoundaryLine?: google.maps.Polyline;
   // #endregion
-
 
   // #region Nodes Properties
   protected readonly draftNodePath = signal<{ point: google.maps.LatLngLiteral; existingNodeId: number | null }[]>([]);
@@ -126,7 +117,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   private draftPointMarkers: google.maps.Marker[] = [];
   // #endregion
 
-
   // #region Entrances Properties
   protected readonly entranceTargetBuilding = signal<Building | null>(null);
   protected readonly isEntranceConfirmOpen = signal(false);
@@ -134,15 +124,28 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly entranceName = signal('');
   // #endregion
 
-
   // #region Paths(Edges) Properties
   protected readonly connectFirstNodeId = signal<number | null>(null);
   protected readonly connectSecondNodeId = signal<number | null>(null);
-  protected readonly isEdgeDetailOpen = signal(false);
-  protected readonly edgeDetailTarget = signal<Edge | null>(null);
   protected readonly selectedEdgeId = signal<number | null>(null);
-  // #endregion
+  protected readonly selectedEdgeIds = signal<Set<number>>(new Set());
 
+  protected readonly edgePropertiesTarget = signal<{ ids: number[] } | null>(null);
+  protected readonly isEdgePropertiesOpen = signal(false);
+  protected readonly isBulkDeleteConfirmOpen = signal(false);
+  protected readonly propertiesName = signal('');
+  protected readonly propertiesIsClosed = signal(false);
+  protected readonly propertiesClosedUntil = signal('');
+  protected readonly propertiesTravelModes = signal<Set<TravelMode>>(new Set([TravelMode.Walking]));
+  protected readonly isBulkEdit = computed(() => (this.edgePropertiesTarget()?.ids.length ?? 0) > 1);
+
+  readonly travelModeOptions = [
+    { value: TravelMode.Walking, label: 'Walking' },
+    { value: TravelMode.Cycling, label: 'Cycling' },
+    { value: TravelMode.Bus, label: 'Bus' },
+    { value: TravelMode.Car, label: 'Car' }
+  ];
+  // #endregion
 
   // #region Map Bindings (computed)
   protected readonly mapPolygons = computed(() =>
@@ -184,8 +187,10 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   protected readonly edgePolylines = computed<MapPolyline[]>(() => {
     const nodesById = new Map(this.nodes().map((n) => [n.nodeId, n]));
-    const detailId = this.edgeDetailTarget()?.edgeId ?? null;
+    const propertiesIds = new Set(this.edgePropertiesTarget()?.ids ?? []);
     const selectedId = this.selectedEdgeId();
+    const multiSelected = this.selectedEdgeIds();
+
     return this.edges()
       .map((e) => {
         const from = nodesById.get(e.fromNodeId);
@@ -197,13 +202,13 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
             { lat: from.location.coordinates[1], lng: from.location.coordinates[0] },
             { lat: to.location.coordinates[1], lng: to.location.coordinates[0] }
           ],
-          selected: e.edgeId === selectedId || e.edgeId === detailId
-        };
+          color: e.isEffectivelyClosed ? '#ef4444' : undefined,
+          selected: e.edgeId === selectedId || multiSelected.has(e.edgeId) || propertiesIds.has(e.edgeId)
+        } as MapPolyline;
       })
       .filter((p): p is MapPolyline => p !== null);
   });
   // #endregion
-
 
   // #region Lifecycle
   ngOnInit(): void {
@@ -220,7 +225,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.edgeService.getEdges().subscribe({ next: (e) => this.edges.set(e) });
   }
   // #endregion
-
 
   // #region Mode & Tab Control
   switchTab(tab: EditorTab): void {
@@ -261,10 +265,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.draftEntrancePoint.set(null);
     this.connectFirstNodeId.set(null);
     this.connectSecondNodeId.set(null);
-    this.closeEdgeDetail();
+    this.selectedEdgeIds.set(new Set());
+    this.closeEdgeProperties();
+    this.isBulkDeleteConfirmOpen.set(false);
   }
   // #endregion
-
 
   // #region Map Events
   onMapReady(map: google.maps.Map): void {
@@ -357,27 +362,20 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   onPolylineClick(edgeId: number): void {
     if (this.activeTab() === 'paths') {
-      if (this.mode() === 'delete-edges') {
-        this.handleDeleteEdge(edgeId);
+      if (this.mode() === 'select-edges') {
+        this.toggleEdgeSelection(edgeId);
         return;
       }
-      else
-        this.selectEdge(edgeId);
+      this.selectEdge(edgeId);
     }
   }
 
   onPolylineDblClick(edgeId: number): void {
     if (this.activeTab() === 'paths') {
-      const edge = this.edges().find((e) => e.edgeId === edgeId);
-      if (edge) {
-        this.edgeDetailTarget.set(edge);
-        this.isEdgeDetailOpen.set(true);
-      }
+      this.openSingleEdgeProperties(edgeId);
     }
-
   }
   // #endregion
-
 
   // #region Buildings
   startDrawing(): void {
@@ -462,7 +460,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     return Math.abs(point.lat - first.lat) < 0.00006 && Math.abs(point.lng - first.lng) < 0.00006;
   }
   // #endregion
-
 
   // #region Nodes
   startPlacingNodes(): void {
@@ -563,7 +560,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
   // #endregion
 
-
   // #region Entrances
   startEntrance(building: Building): void {
     this.entranceTargetBuilding.set(building);
@@ -589,7 +585,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
   // #endregion
 
-
   // #region Paths (Edges)
   startConnecting(): void {
     this.mode.set('connect-nodes');
@@ -597,8 +592,20 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.connectSecondNodeId.set(null);
   }
 
-  startDeletingEdges(): void {
-    this.mode.set('delete-edges');
+  startSelectingEdges(): void {
+    this.mode.set('select-edges');
+    this.selectedEdgeId.set(null);
+    this.selectedEdgeIds.set(new Set());
+  }
+
+  toggleEdgeSelection(edgeId: number): void {
+    const set = new Set(this.selectedEdgeIds());
+    if (set.has(edgeId)) {
+      set.delete(edgeId);
+    } else {
+      set.add(edgeId);
+    }
+    this.selectedEdgeIds.set(set);
   }
 
   submitConnection(): void {
@@ -632,28 +639,98 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     }
   }
 
-  closeEdgeDetail(): void {
-    this.isEdgeDetailOpen.set(false);
-    this.edgeDetailTarget.set(null);
+  private encodeTravelModes(modes: Set<TravelMode>): number {
+    let value = 0;
+    for (const m of modes) value |= m;
+    return value;
   }
 
-  saveEdgeDetail(name: string | null): void {
-    const edge = this.edgeDetailTarget();
-    if (!edge) return;
-    this.edgeService.renameEdge(edge.edgeId, name).subscribe({
-      next: () => {
-        this.toastService.success('Path updated.');
-        this.closeEdgeDetail();
-        this.load();
-      }
-    });
+  private decodeTravelModes(value: number): Set<TravelMode> {
+    const modes = new Set<TravelMode>();
+    for (const m of [TravelMode.Walking, TravelMode.Cycling, TravelMode.Bus, TravelMode.Car]) {
+      if ((value & m) !== 0) modes.add(m);
+    }
+    return modes;
   }
 
-  deleteEdgeDetail(): void {
-    const edge = this.edgeDetailTarget();
+  toggleTravelMode(mode: TravelMode): void {
+    const set = new Set(this.propertiesTravelModes());
+    if (set.has(mode)) set.delete(mode); else set.add(mode);
+    this.propertiesTravelModes.set(set);
+  }
+
+  openSingleEdgeProperties(edgeId: number): void {
+    const edge = this.edges().find((e) => e.edgeId === edgeId);
     if (!edge) return;
-    this.handleDeleteEdge(edge.edgeId);
-    this.closeEdgeDetail();
+
+    this.edgePropertiesTarget.set({ ids: [edge.edgeId] });
+    this.propertiesName.set(edge.name ?? '');
+    this.propertiesIsClosed.set(edge.isClosed);
+    this.propertiesClosedUntil.set(edge.closedUntil ? edge.closedUntil.substring(0, 10) : '');
+    this.propertiesTravelModes.set(this.decodeTravelModes(edge.travelModes));
+    this.isEdgePropertiesOpen.set(true);
+  }
+
+  openBulkEdgeProperties(): void {
+    const ids = Array.from(this.selectedEdgeIds());
+    if (ids.length === 0) return;
+
+    this.edgePropertiesTarget.set({ ids });
+    this.propertiesName.set('');
+    this.propertiesIsClosed.set(false);
+    this.propertiesClosedUntil.set('');
+    this.propertiesTravelModes.set(new Set([TravelMode.Walking]));
+    this.isEdgePropertiesOpen.set(true);
+  }
+
+  openBulkDeleteConfirm(): void {
+    if (this.selectedEdgeIds().size === 0) return;
+    this.isBulkDeleteConfirmOpen.set(true);
+  }
+
+  closeEdgeProperties(): void {
+    this.isEdgePropertiesOpen.set(false);
+    this.edgePropertiesTarget.set(null);
+  }
+
+  saveEdgeProperties(): void {
+    const target = this.edgePropertiesTarget();
+    if (!target) return;
+
+    const travelModes = this.encodeTravelModes(this.propertiesTravelModes());
+    const closedUntil = this.propertiesClosedUntil() ? new Date(this.propertiesClosedUntil()).toISOString() : null;
+
+    if (target.ids.length === 1) {
+      this.edgeService.updateEdge(target.ids[0], {
+        name: this.propertiesName().trim() || null,
+        isClosed: this.propertiesIsClosed(),
+        closedUntil,
+        travelModes
+      }).subscribe({
+        next: () => {
+          this.toastService.success('Path updated.');
+          this.closeEdgeProperties();
+          this.cancelMode();
+          this.load();
+        }
+      });
+    } else {
+      this.edgeService.bulkUpdateEdges(target.ids, this.propertiesIsClosed(), closedUntil, travelModes).subscribe({
+        next: () => {
+          this.toastService.success(`${target.ids.length} paths updated.`);
+          this.closeEdgeProperties();
+          this.cancelMode();
+          this.load();
+        }
+      });
+    }
+  }
+
+  deleteEdgeProperties(): void {
+    const target = this.edgePropertiesTarget();
+    if (!target || target.ids.length !== 1) return;
+    this.handleDeleteEdge(target.ids[0]);
+    this.closeEdgeProperties();
   }
 
   handleDeleteEdge(id: number): void {
@@ -662,6 +739,26 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         this.toastService.success('Path removed.');
         this.load();
       }
+    });
+  }
+
+  confirmBulkDelete(): void {
+    const ids = Array.from(this.selectedEdgeIds());
+    if (ids.length === 0) return;
+
+    let deletedCount = 0;
+    ids.forEach((id) => {
+      this.edgeService.deleteEdge(id).subscribe({
+        next: () => {
+          deletedCount++;
+          if (deletedCount === ids.length) {
+            this.toastService.success(`${ids.length} path(s) deleted.`);
+            this.isBulkDeleteConfirmOpen.set(false);
+            this.cancelMode();
+            this.load();
+          }
+        }
+      });
     });
   }
   // #endregion
@@ -677,4 +774,3 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     }
   }
 }
-

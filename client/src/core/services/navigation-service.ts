@@ -4,9 +4,10 @@ import { RouteResult } from '../../types/route-result';
 
 @Injectable({ providedIn: 'root' })
 export class NavigationService extends BaseService {
-  getRoute(fromBuildingId: number, toBuildingId: number) {
+
+  getRoute(fromBuildingId: number, toBuildingId: number, mode: number = 1) {
     return this.http.get<RouteResult>(
-      `${this.apiUrl}/navigation/route?fromBuildingId=${fromBuildingId}&toBuildingId=${toBuildingId}`
+      `${this.apiUrl}/navigation/route?fromBuildingId=${fromBuildingId}&toBuildingId=${toBuildingId}&mode=${mode}`
     );
   }
 }

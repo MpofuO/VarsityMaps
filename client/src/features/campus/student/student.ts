@@ -9,6 +9,7 @@ import { MapPolygon, MapPolyline } from '../../../types/map';
 import { RouteResult } from '../../../types/route-result';
 import { DecimalPipe } from '@angular/common';
 import { CampusService } from '../../../core/services/campus-service';
+import { TravelMode } from '../../../types/edge';
 
 type PickField = 'origin' | 'destination' | null;
 
@@ -36,10 +37,28 @@ export class Student implements OnInit {
   protected readonly activePickField = signal<PickField>(null);
   protected readonly originBuildingId = signal<number | null>(null);
   protected readonly destinationBuildingId = signal<number | null>(null);
-  protected readonly route = signal<RouteResult | null>(null);
+
+  protected readonly routes = signal<RouteResult[]>([]);
+  protected readonly selectedRouteIndex = signal<number>(0);
   protected readonly isCalculatingRoute = signal(false);
 
+  protected readonly recentSearches = signal<Building[]>([]);
+
+  protected readonly selectedTravelMode = signal<TravelMode>(TravelMode.Walking);
+  protected readonly travelModeOptions = [
+    { value: TravelMode.Walking, label: 'Walk' },
+    { value: TravelMode.Cycling, label: 'Cycle' },
+    { value: TravelMode.Bus, label: 'Bus' },
+    { value: TravelMode.Car, label: 'Car' }
+  ];
+
   private map?: google.maps.Map;
+
+  protected readonly activeRoute = computed(() => {
+    const list = this.routes();
+    const index = this.selectedRouteIndex();
+    return list[index] ?? null;
+  });
 
   protected readonly filteredBuildings = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
@@ -73,15 +92,14 @@ export class Student implements OnInit {
   );
 
   protected readonly routePolylines = computed<MapPolyline[]>(() => {
-    const route = this.route();
-    if (!route) return [];
-    return [
-      {
-        id: route.routeId,
-        path: route.path.coordinates.map(([lng, lat]) => ({ lat, lng })),
-        color: '#22c55e'
-      } as MapPolyline
-    ];
+    return this.routes().map((r, index) => {
+      const isSelected = index === this.selectedRouteIndex();
+      return {
+        id: r.routeId || index,
+        path: r.path.coordinates.map(([lng, lat]) => ({ lat, lng })),
+        color: isSelected ? '#22c55e' : '#9ca3af'
+      } as MapPolyline;
+    });
   });
 
   constructor() {
@@ -92,6 +110,15 @@ export class Student implements OnInit {
         this.loadBuildings();
       }
     });
+
+
+    effect(() => {
+      this.originBuildingId();
+      this.destinationBuildingId();
+      this.selectedTravelMode();
+      this.routes.set([]);
+      this.selectedRouteIndex.set(0);
+    }, { allowSignalWrites: true });
   }
 
   ngOnInit(): void { }
@@ -137,22 +164,70 @@ export class Student implements OnInit {
         return;
       }
       this.originBuildingId.set(buildingId);
-      this.activePickField.set('destination');
+      this.recordRecentSearch(buildingId);
+      if (this.destinationBuildingId() === null)
+        this.activePickField.set('destination');
+      else
+        this.activePickField.set(null);
     } else if (field === 'destination') {
       if (buildingId === this.originBuildingId()) {
         this.toastService.error('Origin and destination must be different buildings.');
         return;
       }
       this.destinationBuildingId.set(buildingId);
+      this.recordRecentSearch(buildingId);
       this.activePickField.set(null);
     } else {
+      console.log('Selecting building after', buildingId);
       this.selectedBuildingId.set(buildingId === this.selectedBuildingId() ? null : buildingId);
+      this.cancelPlanningRoute();
     }
 
     const building = this.buildings().find((b) => b.buildingId === buildingId);
     if (building) {
       this.centerMapOnBoundsIfNeeded(building.boundary.coordinates[0]);
     }
+  }
+
+  private recordRecentSearch(buildingId: number): void {
+    const building = this.buildings().find(b => b.buildingId === buildingId);
+    if (!building) return;
+
+    const list = this.recentSearches().filter(b => b.buildingId !== buildingId);
+    this.recentSearches.set([building, ...list].slice(0, 5));
+  }
+
+  useCurrentLocation(): void {
+    if (!navigator.geolocation) {
+      this.toastService.error('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        let nearest: Building | null = null;
+        let minDistance = Infinity;
+
+        for (const b of this.buildings()) {
+          const [bLng, bLat] = b.boundary.coordinates[0][0];
+          const dist = Math.hypot(bLat - latitude, bLng - longitude);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearest = b;
+          }
+        }
+
+        if (nearest) {
+          this.originBuildingId.set(nearest.buildingId);
+          this.activePickField.set('destination');
+          this.toastService.success(`Nearest origin set to ${nearest.name}`);
+        }
+      },
+      () => {
+        this.toastService.error('Access to location was denied or is unavailable.');
+      }
+    );
   }
 
   private centerMapOnBoundsIfNeeded(ring: [number, number][], forcePan = false): void {
@@ -165,7 +240,6 @@ export class Student implements OnInit {
 
     const mapBounds = this.map.getBounds();
 
-    // If explicit re-center is requested (e.g. campus switch) or map bounds aren't ready yet, pan directly
     if (forcePan || !mapBounds) {
       this.map.panTo(bounds.getCenter());
       return;
@@ -181,12 +255,21 @@ export class Student implements OnInit {
   }
 
   startPlanningRoute(): void {
-    this.selectedBuildingId.set(null);
-    this.originBuildingId.set(null);
-    this.destinationBuildingId.set(null);
-    this.route.set(null);
+    const preselected = this.selectedBuildingId();
     this.isPlanningRoute.set(true);
-    this.activePickField.set('origin');
+    this.routes.set([]);
+
+    if (preselected !== null) {
+      this.destinationBuildingId.set(preselected);
+      this.originBuildingId.set(null);
+      this.selectedBuildingId.set(null);
+      this.activePickField.set('origin');
+    } else {
+      this.selectedBuildingId.set(null);
+      this.originBuildingId.set(null);
+      this.destinationBuildingId.set(null);
+      this.activePickField.set('origin');
+    }
   }
 
   cancelPlanningRoute(): void {
@@ -194,7 +277,7 @@ export class Student implements OnInit {
     this.activePickField.set(null);
     this.originBuildingId.set(null);
     this.destinationBuildingId.set(null);
-    this.route.set(null);
+    this.routes.set([]);
   }
 
   pickField(field: 'origin' | 'destination'): void {
@@ -207,10 +290,12 @@ export class Student implements OnInit {
     if (from === null || to === null) return;
 
     this.isCalculatingRoute.set(true);
-    this.navigationService.getRoute(from, to).subscribe({
-      next: (route) => {
+    this.navigationService.getRoute(from, to, this.selectedTravelMode()).subscribe({
+      next: (routes: any) => {
         this.isCalculatingRoute.set(false);
-        this.route.set(route);
+        const routeList = Array.isArray(routes) ? routes : [routes];
+        this.routes.set(routeList);
+        this.selectedRouteIndex.set(0);
       },
       error: () => {
         this.isCalculatingRoute.set(false);

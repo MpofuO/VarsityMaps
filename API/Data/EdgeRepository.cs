@@ -30,23 +30,25 @@ public class EdgeRepository : BaseRepository<Edge>, IEdgeRepository
             .FirstOrDefaultAsync(e => e.FromNodeId == fromNodeId && e.ToNodeId == toNodeId);
     }
 
-    public async Task<IReadOnlyList<Edge>> GetNavigableEdgesAsync(int campusId)
+    public async Task<IReadOnlyList<Edge>> GetNavigableEdgesAsync(int campusId, TravelMode mode)
     {
         return await context.Edges
             .Include(e => e.FromNode).ThenInclude(n => n.Building)
             .Include(e => e.ToNode).ThenInclude(n => n.Building)
             .Where(e => e.FromNode.CampusId == campusId)
+            .Where(e => (e.TravelModes & mode) != 0)
             .Where(e => e.FromNode.Building == null || e.FromNode.Building.IsAccessible)
             .Where(e => e.ToNode.Building == null || e.ToNode.Building.IsAccessible)
             .ToListAsync();
     }
 
-    public async Task<IReadOnlyList<Edge>> GetGuestNavigableEdgesAsync(int campusId)
+    public async Task<IReadOnlyList<Edge>> GetGuestNavigableEdgesAsync(int campusId, TravelMode mode)
     {
         return await context.Edges
             .Include(e => e.FromNode).ThenInclude(n => n.Building)
             .Include(e => e.ToNode).ThenInclude(n => n.Building)
             .Where(e => e.FromNode.CampusId == campusId)
+            .Where(e => (e.TravelModes & mode) != 0)
             .Where(e => e.FromNode.Building == null ||
                         (e.FromNode.Building.IsAccessible && e.FromNode.Building.IsGuestAccessible))
             .Where(e => e.ToNode.Building == null ||

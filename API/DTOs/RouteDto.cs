@@ -1,3 +1,4 @@
+using API.Entities;
 using NetTopologySuite.Geometries;
 
 namespace API.DTOs;
@@ -10,4 +11,5 @@ public class RouteDto
     public int EstimatedWalkingTimeMinutes { get; set; }
     public int FromBuildingId { get; set; }
     public int ToBuildingId { get; set; }
+    public TravelMode TravelMode { get; set; }
 }

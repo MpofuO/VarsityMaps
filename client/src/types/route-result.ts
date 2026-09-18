@@ -7,4 +7,5 @@ export interface RouteResult {
   estimatedWalkingTimeMinutes: number;
   fromBuildingId: number;
   toBuildingId: number;
+  travelMode: number;
 }

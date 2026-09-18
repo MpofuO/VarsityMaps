@@ -1,3 +1,4 @@
+using API.Entities;
 using API.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Route = API.Entities.Route;
@@ -10,10 +11,11 @@ public class RouteRepository : BaseRepository<Route>, IRouteRepository
     {
     }
 
-    public async Task<Route?> GetByBuildingsAsync(int fromBuildingId, int toBuildingId)
+    public async Task<Route?> GetByBuildingsAsync(int fromBuildingId, int toBuildingId, TravelMode mode)
     {
         return await context.Routes
-            .FirstOrDefaultAsync(r => r.FromBuildingId == fromBuildingId && r.ToBuildingId == toBuildingId);
+            .FirstOrDefaultAsync(r => r.FromBuildingId == fromBuildingId && r.ToBuildingId == toBuildingId
+                     && r.TravelMode == mode);
     }
 
     public async Task<Route?> GetByNodesAsync(int fromNodeId, int toNodeId)

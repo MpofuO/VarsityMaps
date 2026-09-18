@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BaseService } from './base-service';
-import { Edge } from '../../types/edge';
+import { Edge, EdgePropertiesModel } from '../../types/edge';
 
 @Injectable({ providedIn: 'root' })
 export class EdgeService extends BaseService {
@@ -12,8 +12,12 @@ export class EdgeService extends BaseService {
     return this.http.post<Edge>(`${this.apiUrl}/edge?fromNodeId=${fromNodeId}&toNodeId=${toNodeId}`, {});
   }
 
-  renameEdge(id: number, name: string | null) {
-    return this.http.put<Edge>(`${this.apiUrl}/edge/${id}/name`, { name: name });
+  updateEdge(id: number, model: EdgePropertiesModel) {
+    return this.http.put<Edge>(`${this.apiUrl}/edge/${id}`, model);
+  }
+
+  bulkUpdateEdges(edgeIds: number[], isClosed: boolean, closedUntil: string | null, travelModes: number) {
+    return this.http.put<Edge[]>(`${this.apiUrl}/edge/bulk`, { edgeIds, isClosed, closedUntil, travelModes });
   }
 
   deleteEdge(id: number) {

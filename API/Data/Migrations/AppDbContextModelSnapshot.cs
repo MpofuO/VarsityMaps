@@ -241,13 +241,22 @@ namespace API.Data.Migrations
                     b.Property<int>("CampusId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ClosedUntil")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("FromNodeId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("ToNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TravelModes")
                         .HasColumnType("int");
 
                     b.Property<decimal>("Weight")
@@ -376,6 +385,9 @@ namespace API.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("ToNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TravelMode")
                         .HasColumnType("int");
 
                     b.Property<decimal>("Weight")

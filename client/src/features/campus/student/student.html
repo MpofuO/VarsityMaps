@@ -10,7 +10,7 @@
     }
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 flex-1 min-h-0">
+  <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
     <div class="rounded-box border border-base-300 bg-base-100 p-3 flex flex-col min-h-0 shadow-sm">
 
       @if (isPlanningRoute()) {
@@ -35,13 +35,30 @@
             {{ destinationBuilding()?.name || 'Tap to choose' }}
           </button>
 
+          @if (activePickField() === 'origin') {
+            <button class="btn btn-xs btn-outline btn-accent w-full" (click)="useCurrentLocation()">
+              📍 Use Current Location
+            </button>
+          }
+
           @if (activePickField()) {
             <div class="text-xs text-center text-base-content/60 italic">
               Select a {{ activePickField() }} building from the map or list below
             </div>
           }
 
-          @if (originBuildingId() && destinationBuildingId() && !route()) {
+          <div class="join w-full">
+            @for (option of travelModeOptions; track option.value) {
+              <button
+                class="btn btn-xs join-item flex-1"
+                [class.btn-primary]="selectedTravelMode() === option.value"
+                [class.btn-outline]="selectedTravelMode() !== option.value"
+                (click)="selectedTravelMode.set(option.value)"
+              >{{ option.label }}</button>
+            }
+          </div>
+
+          @if (originBuildingId() && destinationBuildingId() && routes().length === 0) {
             <button class="btn btn-success btn-sm w-full text-success-content" [disabled]="isCalculatingRoute()" (click)="calculateRoute()">
               @if (isCalculatingRoute()) {
                 <span class="loading loading-spinner loading-xs"></span>
@@ -50,15 +67,28 @@
             </button>
           }
 
-          @if (route(); as r) {
-            <div class="rounded-btn bg-success/10 border border-success/30 p-3 space-y-1">
-              <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">Distance</span>
-                <span class="font-semibold">{{ r.distanceMeters | number:'1.0-0' }} m</span>
+          @if (routes().length > 0) {
+            <div class="space-y-2 pt-2">
+              <div class="text-xs font-semibold uppercase text-base-content/50">
+                Route Options ({{ routes().length }})
               </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">Est. walking time</span>
-                <span class="font-semibold">{{ r.estimatedWalkingTimeMinutes }} min</span>
+
+              <div class="space-y-1">
+                @for (r of routes(); track $index) {
+                  <div
+                    class="p-2 rounded-btn border text-xs flex justify-between items-center cursor-pointer transition-colors"
+                    [class.border-success]="selectedRouteIndex() === $index"
+                    [class.bg-success/10]="selectedRouteIndex() === $index"
+                    [class.border-base-300]="$index !== selectedRouteIndex()"
+                    (click)="selectedRouteIndex.set($index)"
+                  >
+                    <div>
+                      <span class="font-bold">Option {{ $index + 1 }}</span>
+                      <span class="text-base-content/60 ml-2">{{ r.distanceMeters | number:'1.0-0' }} m</span>
+                    </div>
+                    <span class="font-medium text-success">{{ r.estimatedWalkingTimeMinutes }} min</span>
+                  </div>
+                }
               </div>
             </div>
           }
@@ -66,6 +96,21 @@
           <button class="btn btn-ghost btn-sm w-full" (click)="cancelPlanningRoute()">Cancel</button>
         </div>
         <div class="divider my-0"></div>
+      }
+
+      @if (recentSearches().length > 0) {
+        <div class="mb-3 shrink-0">
+          <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-1 px-1">
+            Recent Searches
+          </div>
+          <div class="flex flex-wrap gap-1">
+            @for (b of recentSearches(); track b.buildingId) {
+              <button class="btn btn-xs btn-ghost border border-base-300" (click)="selectBuilding(b.buildingId)">
+                {{ b.name }}
+              </button>
+            }
+          </div>
+        </div>
       }
 
       <label class="input input-bordered input-sm flex items-center gap-2 mb-3 shrink-0">

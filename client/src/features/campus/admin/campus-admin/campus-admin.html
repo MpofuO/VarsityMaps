@@ -13,29 +13,20 @@
     </div>
 
     <div class="flex items-center gap-1.5 bg-base-200/60 p-1 rounded-full border border-base-300">
-      <button
-        type="button"
-        class="btn btn-xs rounded-full px-3 transition-all"
-        [class.btn-primary]="activeTab() === 'buildings'"
-        [class.btn-ghost]="activeTab() !== 'buildings'"
+      <button type="button" class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'buildings'" [class.btn-ghost]="activeTab() !== 'buildings'"
         (click)="switchTab('buildings')">
         Buildings
       </button>
 
-      <button
-        type="button"
-        class="btn btn-xs rounded-full px-3 transition-all"
-        [class.btn-primary]="activeTab() === 'nodes'"
-        [class.btn-ghost]="activeTab() !== 'nodes'"
+      <button type="button" class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'nodes'" [class.btn-ghost]="activeTab() !== 'nodes'"
         (click)="switchTab('nodes')">
         Nodes
       </button>
 
-      <button
-        type="button"
-        class="btn btn-xs rounded-full px-3 transition-all"
-        [class.btn-primary]="activeTab() === 'paths'"
-        [class.btn-ghost]="activeTab() !== 'paths'"
+      <button type="button" class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'paths'" [class.btn-ghost]="activeTab() !== 'paths'"
         (click)="switchTab('paths')">
         Paths
       </button>
@@ -59,26 +50,21 @@
 
     @if (activeTab() === 'paths') {
     <app-campus-paths [edges]="edges()" [nodes]="nodes()" [isConnecting]="mode() === 'connect-nodes'"
-      [isDeletingEdges]="mode() === 'delete-edges'" [selectedEdgeId]="selectedEdgeId()"
-      (startConnecting)="startConnecting()" (startDeletingEdges)="startDeletingEdges()"
-      (pathEditClick)="onPolylineDblClick($event)" (selectEdge)="selectEdge($event)" />
+      [isSelectingEdges]="mode() === 'select-edges'" [selectedEdgeId]="selectedEdgeId()"
+      [selectedEdgeIds]="selectedEdgeIds()" (startConnecting)="startConnecting()"
+      (startSelectingEdges)="startSelectingEdges()" (editSelectedEdges)="openBulkEdgeProperties()"
+      (deleteSelectedEdges)="openBulkDeleteConfirm()" (pathEditClick)="onPolylineDblClick($event)"
+      (selectEdge)="mode() === 'select-edges' ? toggleEdgeSelection($event) : selectEdge($event)" />
     }
 
     <!-- Persistent Map View -->
     <div class="relative w-full h-full min-h-0">
-      <app-campus-map 
-        [polygons]="mapPolygons()" 
-        [markers]="nodeMarkers()" 
-        [polylines]="edgePolylines()"
-        [center]="campus()?.center! | toLatLngPipe"
-        (mapClick)="onMapClick($event)" 
-        (polygonClick)="selectBuilding($event)" 
-        (polygonDblClick)="onBuildingDblClick($event)"
-        (markerClick)="onMarkerClick($event)"
-        (markerDblClick)="onMarkerDblClick($event)"
-        (polylineClick)="onPolylineClick($event)"
-        (polylineDblClick)="onPolylineDblClick($event)"
-        (ready)="onMapReady($event)"  />
+      <app-campus-map [polygons]="mapPolygons()" [markers]="nodeMarkers()" [polylines]="edgePolylines()"
+        [center]="campus()?.center! | toLatLngPipe" (mapClick)="onMapClick($event)"
+        (polygonClick)="selectBuilding($event)" (polygonDblClick)="onBuildingDblClick($event)"
+        (markerClick)="onMarkerClick($event)" (markerDblClick)="onMarkerDblClick($event)"
+        (polylineClick)="onPolylineClick($event)" (polylineDblClick)="onPolylineDblClick($event)"
+        (ready)="onMapReady($event)" />
 
       <!-- Drawing & Action Controls Overlay -->
       @if (mode() === 'draw-building') {
@@ -130,14 +116,6 @@
       </div>
       }
 
-      @if (mode() === 'delete-edges') {
-      <div
-        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
-        <span class="text-xs font-medium text-error">Delete mode: click any path to remove it instantly</span>
-        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Done</button>
-      </div>
-      }
-
       @if (mode() === 'place-entrance') {
       <div
         class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
@@ -145,41 +123,83 @@
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
       </div>
       }
+
+      @if (mode() === 'select-edges') {
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+        <span class="text-xs font-medium">{{ selectedEdgeIds().size }} path(s) selected</span>
+        <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="selectedEdgeIds().size === 0"
+          (click)="openBulkEdgeProperties()">Edit Selected</button>
+        <button class="btn btn-xs btn-error rounded-full px-3" [disabled]="selectedEdgeIds().size === 0"
+          (click)="openBulkDeleteConfirm()">Delete Selected</button>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
+      </div>
+      }
     </div>
   </div>
 </section>
 
-<!-- Entrance Modal -->
-<app-modal [isOpen]="isEntranceConfirmOpen()" title="Add entrance" (closed)="isEntranceConfirmOpen.set(false)">
-  <div class="space-y-4">
-    <p class="text-sm">Add an entrance node here for <span class="font-semibold">{{ entranceTargetBuilding()?.name
-        }}</span>?</p>
-    <input class="input input-bordered input-sm w-full" placeholder="Entrance name (e.g. Main Entrance)"
-      [value]="entranceName()" (input)="entranceName.set($any($event.target).value)" />
-    <div class="modal-action">
-      <button type="button" class="btn btn-ghost btn-sm" (click)="isEntranceConfirmOpen.set(false)">Cancel</button>
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!entranceName().trim()"
-        (click)="confirmEntrance()">Add entrance</button>
+<!-- Path Properties Modal -->
+<app-modal [isOpen]="isEdgePropertiesOpen()" (closeModal)="closeEdgeProperties()">
+  <div class="space-y-6">
+    <h3 class="font-bold text-lg">
+      {{ isBulkEdit() ? 'Edit Multiple Paths (' + edgePropertiesTarget()?.ids?.length + ')' : 'Path Properties' }}
+    </h3>
+
+    @if (!isBulkEdit()) {
+    <div class="form-control">
+      <label class="label mb-1"><span class="label-text font-medium">Name (Optional)</span></label>
+      <input type="text" class="input input-bordered w-full" [value]="propertiesName()" (input)="propertiesName.set($any($event.target).value)" />
+    </div>
+    }
+
+    <div class="form-control">
+      <label class="label cursor-pointer justify-start gap-3 py-1">
+        <input type="checkbox" class="checkbox checkbox-primary" [checked]="propertiesIsClosed()" (change)="propertiesIsClosed.set($any($event.target).checked)" />
+        <span class="label-text font-medium">Closed</span>
+      </label>
+    </div>
+
+    @if (propertiesIsClosed()) {
+    <div class="form-control">
+      <label class="label flex-col items-start gap-1 mb-1">
+        <span class="label-text font-medium">Closed Until</span>
+        <span class="label-text-alt text-base-content/60">Leave empty if the closure duration is indefinite or permanent.</span>
+      </label>
+      <input type="date" class="input input-bordered w-full" [value]="propertiesClosedUntil()" (input)="propertiesClosedUntil.set($any($event.target).value)" />
+    </div>
+    }
+
+    <div class="form-control">
+      <label class="label mb-1"><span class="label-text font-medium">Allowed Travel Modes</span></label>
+      <div class="flex flex-wrap gap-2 pt-1">
+        @for (opt of travelModeOptions; track opt.value) {
+        <button type="button" class="btn btn-xs rounded-full px-3 py-1" [class.btn-primary]="propertiesTravelModes().has(opt.value)" [class.btn-outline]="!propertiesTravelModes().has(opt.value)" (click)="toggleTravelMode(opt.value)">
+          {{ opt.label }}
+        </button>
+        }
+      </div>
+    </div>
+
+    <div class="modal-action mt-8 pt-2">
+      @if (!isBulkEdit()) {
+      <button class="btn btn-error btn-sm" (click)="deleteEdgeProperties()">Delete Path</button>
+      }
+      <button class="btn btn-ghost btn-sm" (click)="closeEdgeProperties()">Cancel</button>
+      <button class="btn btn-primary btn-sm" (click)="saveEdgeProperties()">Save Changes</button>
     </div>
   </div>
 </app-modal>
 
-<app-modal [isOpen]="isLeaveConfirmOpen()" title="Unsaved changes" (closed)="cancelLeave()">
+<!-- Bulk Delete Confirm Modal -->
+<app-modal [isOpen]="isBulkDeleteConfirmOpen()" (closeModal)="isBulkDeleteConfirmOpen.set(false)">
   <div class="space-y-4">
-    <p class="text-sm">You have unsaved work in the campus editor - leave without saving?</p>
+    <h3 class="font-bold text-lg text-error">Delete {{ selectedEdgeIds().size }} Paths?</h3>
+    <p class="text-sm">Are you sure you want to permanently delete these {{ selectedEdgeIds().size }} selected paths?
+      This action cannot be undone.</p>
     <div class="modal-action">
-      <button type="button" class="btn btn-ghost btn-sm" (click)="cancelLeave()">Stay</button>
-      <button type="button" class="btn btn-error btn-sm text-error-content" (click)="confirmLeave()">Leave without saving</button>
+      <button class="btn btn-ghost btn-sm" (click)="isBulkDeleteConfirmOpen.set(false)">Cancel</button>
+      <button class="btn btn-error btn-sm" (click)="confirmBulkDelete()">Delete Paths</button>
     </div>
   </div>
 </app-modal>
-
-<app-entity-detail-modal
-  [isOpen]="isEdgeDetailOpen()"
-  title="Edit path"
-  [name]="edgeDetailTarget()?.name ?? null"
-  namePlaceholder="e.g. Corridor, Stairs, Passage"
-  (save)="saveEdgeDetail($event)"
-  (delete)="deleteEdgeDetail()"
-  (closed)="closeEdgeDetail()"
-/>

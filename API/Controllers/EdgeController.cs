@@ -58,9 +58,9 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add edge.");
         return Ok(edge.ToDto());
     }
-    
-    [HttpPut("{edgeId:int}/name")]
-    public async Task<ActionResult<EdgeDto>> RenameEdge(int edgeId, [FromBody] RenameDto renameDto)
+
+    [HttpPut("{edgeId:int}")]
+    public async Task<ActionResult<EdgeDto>> UpdateEdge(int edgeId, EdgePropertiesDto dto)
     {
         var edge = await uow.EdgeRepository.GetByIdAsync(edgeId);
         if (edge is null) return NotFound();
@@ -68,10 +68,41 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (edge.CampusId != callerCampusId) return NotFound();
 
-        edge.Name = renameDto.Name;
+        edge.Name = dto.Name;
+        edge.IsClosed = dto.IsClosed;
+        edge.ClosedUntil = dto.IsClosed ? dto.ClosedUntil : null;
+        edge.TravelModes = dto.TravelModes;
+
         await uow.EdgeRepository.UpdateAsync(edge);
-        if (!await uow.CompleteAsync()) return BadRequest("Failed to rename path.");
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to update path.");
         return Ok(edge.ToDto());
+    }
+
+    [HttpPut("bulk")]
+    public async Task<ActionResult<IEnumerable<EdgeDto>>> BulkUpdate(BulkEdgeUpdateDto dto)
+    {
+        if (dto.EdgeIds.Count == 0) return BadRequest("No paths selected.");
+
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
+        var edges = new List<Edge>();
+
+        foreach (var id in dto.EdgeIds)
+        {
+            var edge = await uow.EdgeRepository.GetByIdAsync(id);
+            if (edge is null || edge.CampusId != campusId) return BadRequest($"Path {id} not found on your campus.");
+            edges.Add(edge);
+        }
+
+        foreach (var edge in edges)
+        {
+            edge.IsClosed = dto.IsClosed;
+            edge.ClosedUntil = dto.IsClosed ? dto.ClosedUntil : null;
+            edge.TravelModes = dto.TravelModes;
+            await uow.EdgeRepository.UpdateAsync(edge);
+        }
+
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to update paths.");
+        return Ok(edges.Select(e => e.ToDto()));
     }
 
     [HttpDelete("{edgeId:int}")]

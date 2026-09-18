@@ -15,14 +15,16 @@ export class CampusPaths {
   edges = input.required<Edge[]>();
   nodes = input.required<Node[]>();
   isConnecting = input<boolean>(false);
-  isDeletingEdges = input<boolean>(false);
+  isSelectingEdges = input<boolean>(false);
   selectedEdgeId = input<number | null>(null);
+  selectedEdgeIds = input<Set<number>>(new Set());
 
   startConnecting = output<void>();
-  startDeletingEdges = output<void>();
+  startSelectingEdges = output<void>();
+  editSelectedEdges = output<void>();
+  deleteSelectedEdges = output<void>();
   pathEditClick = output<number>();
   selectEdge = output<number>();
-
 
   constructor() {
     effect(() => {

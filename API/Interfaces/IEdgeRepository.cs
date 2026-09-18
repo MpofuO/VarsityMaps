@@ -8,6 +8,6 @@ public interface IEdgeRepository : IBaseRepository<Edge>
     Task<IEnumerable<Edge>> GetByNodeAsync(int nodeId);
     Task<Edge?> GetByNodesAsync(int fromNodeId, int toNodeId);
 
-    Task<IReadOnlyList<Edge>> GetNavigableEdgesAsync(int campusId);
-    Task<IReadOnlyList<Edge>> GetGuestNavigableEdgesAsync(int campusId);
+    Task<IReadOnlyList<Edge>> GetNavigableEdgesAsync(int campusId, TravelMode mode);
+    Task<IReadOnlyList<Edge>> GetGuestNavigableEdgesAsync(int campusId, TravelMode mode);
 }

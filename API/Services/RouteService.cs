@@ -7,11 +7,15 @@ namespace API.Services;
 
 public class RouteService : IRouteService
 {
-    public Route? GetShortestPath(IReadOnlyList<Edge> navigableEdges, IEnumerable<Node> fromEntrances, IEnumerable<Node> toEntrances)
+    private const int MaxRoutes = 4;
+
+    public List<Route> GetShortestPath(IReadOnlyList<Edge> navigableEdges, IEnumerable<Node> fromEntrances, IEnumerable<Node> toEntrances)
     {
+        var routes = new List<Route>();
         var graph = BuildAdjacency(navigableEdges);
 
-        Route? best = null;
+        // Collect candidate paths across all entrance pairs
+        var candidatePaths = new List<(decimal Weight, int FromId, int ToId, List<Node> Path)>();
 
         foreach (var from in fromEntrances)
         {
@@ -20,23 +24,41 @@ public class RouteService : IRouteService
             foreach (var to in toEntrances)
             {
                 if (!distances.TryGetValue(to.NodeId, out var distance)) continue;
-                if (best is not null && distance >= best.Weight) continue;
 
                 var path = ReconstructPath(previous, from.NodeId, to.NodeId, navigableEdges);
                 if (path is null) continue;
 
-                best = new Route
-                {
-                    Path = BuildLineString(path),
-                    FromNodeId = from.NodeId,
-                    ToNodeId = to.NodeId,
-                    Weight = distance,
-                    CheckPoints = [] // deliberately skipped, per earlier decision
-                };
+                candidatePaths.Add((distance, from.NodeId, to.NodeId, path));
             }
         }
 
-        return best;
+        // Sort candidates by total distance ascending
+        candidatePaths = candidatePaths.OrderBy(c => c.Weight).ToList();
+
+        // Distinct route tracking (to eliminate duplicate geometry paths)
+        var seenGeometries = new HashSet<string>();
+
+        foreach (var candidate in candidatePaths)
+        {
+            if (routes.Count >= MaxRoutes) break;
+
+            var lineString = BuildLineString(candidate.Path);
+            var geoKey = lineString.ToText(); // WKT string representation for deduplication
+
+            if (seenGeometries.Add(geoKey))
+            {
+                routes.Add(new Route
+                {
+                    Path = lineString,
+                    FromNodeId = candidate.FromId,
+                    ToNodeId = candidate.ToId,
+                    Weight = candidate.Weight,
+                    CheckPoints = []
+                });
+            }
+        }
+
+        return routes;
     }
 
     public List<Tuple<Point, string>> GetRouteGuides(Route route)
@@ -108,7 +130,7 @@ public class RouteService : IRouteService
 
         while (currentId != fromId)
         {
-            if (!previous.TryGetValue(currentId, out var prevId)) return null; // no path exists
+            if (!previous.TryGetValue(currentId, out var prevId)) return null;
             path.Add(nodesById[prevId]);
             currentId = prevId;
         }

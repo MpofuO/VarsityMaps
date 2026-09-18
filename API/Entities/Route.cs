@@ -9,6 +9,7 @@ public class Route
     public decimal Weight { get; set; }
     public int SearchCount { get; set; }
     public DateTime LastRetrieved { get; set; } = DateTime.UtcNow;
+    public TravelMode TravelMode { get; set; } = TravelMode.Walking;
 
     public int FromBuildingId { get; set; }
     public int ToBuildingId { get; set; }
