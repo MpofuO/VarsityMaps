@@ -20,8 +20,10 @@ export class CampusNode {
 });
   isPlacingNodes = input<boolean>(false);
   selectedNodeId = input<number | null>(null);
+  isConnecting = input<boolean>(false);
 
   startPlacingNodes = output<void>();
+  startConnecting = output<void>();
   selectNode = output<number>();
   renameNode = output<{ id: number; name: string | null }>();
   deleteNode = output<number>();

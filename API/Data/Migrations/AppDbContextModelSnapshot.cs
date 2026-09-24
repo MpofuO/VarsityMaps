@@ -204,32 +204,6 @@ namespace API.Data.Migrations
                     b.ToTable("Campus", (string)null);
                 });
 
-            modelBuilder.Entity("API.Entities.CheckPoint", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<Point>("Location")
-                        .IsRequired()
-                        .HasColumnType("geography");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("RouteId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RouteId");
-
-                    b.ToTable("CheckPoint", (string)null);
-                });
-
             modelBuilder.Entity("API.Entities.Edge", b =>
                 {
                     b.Property<int>("EdgeId")
@@ -397,6 +371,35 @@ namespace API.Data.Migrations
                     b.HasKey("RouteId");
 
                     b.ToTable("Route", (string)null);
+                });
+
+            modelBuilder.Entity("API.Entities.RouteGuide", b =>
+                {
+                    b.Property<int>("RouteGuideId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RouteGuideId"));
+
+                    b.Property<string>("Instruction")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Point>("Location")
+                        .IsRequired()
+                        .HasColumnType("geography");
+
+                    b.Property<int>("RouteId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StepIndex")
+                        .HasColumnType("int");
+
+                    b.HasKey("RouteGuideId");
+
+                    b.HasIndex("RouteId");
+
+                    b.ToTable("RouteGuide", (string)null);
                 });
 
             modelBuilder.Entity("API.Entities.University", b =>
@@ -575,17 +578,6 @@ namespace API.Data.Migrations
                     b.Navigation("University");
                 });
 
-            modelBuilder.Entity("API.Entities.CheckPoint", b =>
-                {
-                    b.HasOne("API.Entities.Route", "Route")
-                        .WithMany("CheckPoints")
-                        .HasForeignKey("RouteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Route");
-                });
-
             modelBuilder.Entity("API.Entities.Edge", b =>
                 {
                     b.HasOne("API.Entities.Node", "FromNode")
@@ -631,6 +623,17 @@ namespace API.Data.Migrations
                     b.Navigation("Building");
 
                     b.Navigation("Campus");
+                });
+
+            modelBuilder.Entity("API.Entities.RouteGuide", b =>
+                {
+                    b.HasOne("API.Entities.Route", "Route")
+                        .WithMany("RouteGuides")
+                        .HasForeignKey("RouteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Route");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -707,7 +710,7 @@ namespace API.Data.Migrations
 
             modelBuilder.Entity("API.Entities.Route", b =>
                 {
-                    b.Navigation("CheckPoints");
+                    b.Navigation("RouteGuides");
                 });
 
             modelBuilder.Entity("API.Entities.University", b =>

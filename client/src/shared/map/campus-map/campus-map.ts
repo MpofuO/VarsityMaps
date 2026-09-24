@@ -18,6 +18,7 @@ export class CampusMap implements AfterViewInit {
   polygons = input<MapPolygon[]>([]);
   markers = input<MapMarker[]>([]);
   polylines = input<MapPolyline[]>([]);
+  isStudent = input<boolean>(false);
 
   mapClick = output<google.maps.LatLng>();
   polygonClick = output<number>();
@@ -83,18 +84,21 @@ export class CampusMap implements AfterViewInit {
       }
     }
 
+    const isStudentUser = this.isStudent();
+
     for (const item of polygons) {
+      const isHiddenForStudent = isStudentUser && !item.selected;
+
       const options: google.maps.PolygonOptions = {
         paths: item.paths,
         strokeColor: item.selected ? '#3b82f6' : '#7c3aed',
         strokeWeight: item.selected ? 3 : 2,
+        strokeOpacity: isHiddenForStudent ? 0 : 1,
         fillColor: item.selected ? '#1d4ed8' : '#8b5cf6',
-        fillOpacity: item.selected ? 0.50 : 0.40,
+        fillOpacity: isHiddenForStudent ? 0 : item.selected ? 0.50 : 0.40,
         clickable: true,
         zIndex: item.selected ? 10 : 1
       };
-
-
 
       const existing = this.renderedPolygons.get(item.id);
       if (!existing) {
@@ -161,8 +165,8 @@ export class CampusMap implements AfterViewInit {
       const options: google.maps.PolylineOptions = {
         path: item.path,
         strokeColor: item.selected ? '#22c55e' : (item.color ?? '#64748b'),
-        strokeWeight: item.selected ? 12 : 8,
-        zIndex: item.selected ? 10 : 1
+        strokeWeight: item.selected ? 10 : 6,
+        zIndex: item.selected ? 5 : 1
       };
 
       const existing = this.renderedPolylines.get(item.id);

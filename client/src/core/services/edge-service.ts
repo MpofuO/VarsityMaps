@@ -8,6 +8,12 @@ export class EdgeService extends BaseService {
     return this.http.get<Edge[]>(`${this.apiUrl}/edge`);
   }
 
+  getPathEdges(startNodeId: number, endNodeId: number) {
+    return this.http.get<number[]>(`${this.apiUrl}/navigation/path-edges`, {
+      params: { startNodeId, endNodeId }
+    });
+  }
+
   addEdge(fromNodeId: number, toNodeId: number) {
     return this.http.post<Edge>(`${this.apiUrl}/edge?fromNodeId=${fromNodeId}&toNodeId=${toNodeId}`, {});
   }

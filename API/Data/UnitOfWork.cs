@@ -17,7 +17,7 @@ public class UnitOfWork : IUnitOfWork
         NodeRepository = new NodeRepository(_context);
         EdgeRepository = new EdgeRepository(_context);
         RouteRepository = new RouteRepository(_context);
-        CheckpointRepository = new CheckpointRepository(_context);
+        RouteGuideRepository = new RouteGuideRepository(_context);
         ApplicationRepository = new ApplicationRepository(_context);
         InvitationRepository = new InvitationRepository(_context);
     }
@@ -28,7 +28,7 @@ public class UnitOfWork : IUnitOfWork
     public INodeRepository NodeRepository { get; }
     public IEdgeRepository EdgeRepository { get; }
     public IRouteRepository RouteRepository { get; }
-    public ICheckpointRepository CheckpointRepository { get; }
+    public IRouteGuideRepository RouteGuideRepository { get; }
     public IApplicationRepository ApplicationRepository { get; }
     public IInvitationRepository InvitationRepository { get; }
 

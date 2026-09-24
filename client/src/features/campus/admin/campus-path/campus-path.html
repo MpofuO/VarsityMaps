@@ -1,16 +1,22 @@
 <div class="rounded-box border border-base-300 bg-base-100 p-3 flex flex-col min-h-0 shadow-sm">
   <div class="grid grid-cols-2 gap-2 mb-3 shrink-0">
-    <button class="btn btn-primary btn-sm" [disabled]="isConnecting() || isSelectingEdges()"
-      (click)="startConnecting.emit()">
-      Quick connect
-    </button>
-    <button class="btn btn-outline btn-sm" [disabled]="isConnecting() || isSelectingEdges()"
+    <button class="btn btn-primary btn-sm" [disabled]="isSelectingEdges() || isSelectingPathRange()"
       (click)="startSelectingEdges.emit()">
       Select Multiple
     </button>
+    <button class="btn btn-outline btn-sm" [disabled]="isSelectingEdges() || isSelectingPathRange()"
+      (click)="startSelectingPathRange.emit()">
+      Select Range
+    </button>
   </div>
 
-  @if (isSelectingEdges()) {
+  @if (isSelectingPathRange()) {
+    <p class="text-xs text-info font-medium mb-3 px-1">
+      Select the start and end nodes for the range
+    </p>
+  }
+  
+  @if (isSelectingEdges() || isSelectingPathRange()) {
   <div class="alert alert-info text-xs py-2 px-3 mb-3 flex items-center justify-between">
     <span>{{ selectedEdgeIds().size }} selected</span>
     <div class="flex items-center gap-1">
@@ -43,7 +49,7 @@
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <span class="text-xs text-base-content/50">{{ row.edge.weight | number:'1.0-1' }}m</span>
-        @if (!isSelectingEdges()) {
+        @if (!isSelectingEdges() && !isSelectingPathRange()) {
           <button class="invisible group-hover:visible btn btn-ghost btn-xs btn-square" title="Options"
             (click)="$event.stopPropagation(); pathEditClick.emit(row.edge.edgeId)">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"

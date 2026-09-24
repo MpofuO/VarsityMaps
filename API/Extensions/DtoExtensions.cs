@@ -104,17 +104,38 @@ public static class DtoExtensions
     public static RouteDto ToDto(this Route route)
     {
         const double averageWalkingSpeedMetersPerSecond = 1.4;
-        var estimatedMinutes = (double)route.Weight / averageWalkingSpeedMetersPerSecond / 60.0;
+        const double averageCyclingSpeedMetersPerSecond = 4.5;
+        const double averageDrivingSpeedMetersPerSecond = 7;
+
+        double speedMetersPerSecond = route.TravelMode switch
+        {
+            TravelMode.Walking => averageWalkingSpeedMetersPerSecond,
+            TravelMode.Cycling => averageCyclingSpeedMetersPerSecond,
+            _ => averageDrivingSpeedMetersPerSecond
+        };
+
+        var estimatedMinutes = (double)route.Weight / speedMetersPerSecond / 60.0;
+
 
         return new RouteDto
         {
             RouteId = route.RouteId,
             Path = route.Path,
             DistanceMeters = route.Weight,
-            EstimatedWalkingTimeMinutes = Math.Max(1, (int)Math.Round(estimatedMinutes)),
+            EstimatedTravelTimeMinutes = Math.Max(1, (int)Math.Round(estimatedMinutes)),
             FromBuildingId = route.FromBuildingId,
             ToBuildingId = route.ToBuildingId,
             TravelMode = route.TravelMode
+        };
+    }
+
+    public static RouteGuideDto ToDto(this RouteGuide guide)
+    {
+        return new RouteGuideDto
+        {
+            StepIndex = guide.StepIndex,
+            Location = guide.Location,
+            Instruction = guide.Instruction
         };
     }
 }

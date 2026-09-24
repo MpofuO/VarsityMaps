@@ -14,13 +14,13 @@ export class CampusPaths {
   private element = inject(ElementRef);
   edges = input.required<Edge[]>();
   nodes = input.required<Node[]>();
-  isConnecting = input<boolean>(false);
   isSelectingEdges = input<boolean>(false);
+  isSelectingPathRange = input<boolean>(false);
   selectedEdgeId = input<number | null>(null);
   selectedEdgeIds = input<Set<number>>(new Set());
 
-  startConnecting = output<void>();
   startSelectingEdges = output<void>();
+  startSelectingPathRange = output<void>();
   editSelectedEdges = output<void>();
   deleteSelectedEdges = output<void>();
   pathEditClick = output<number>();

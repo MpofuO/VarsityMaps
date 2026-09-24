@@ -13,8 +13,10 @@ public class EdgeRepository : BaseRepository<Edge>, IEdgeRepository
     public async Task<IEnumerable<Edge>> GetByCampusAsync(int campusId)
     {
         return await context.Edges
-            .Where(e => e.CampusId == campusId)
-            .ToListAsync();
+        .Include(e => e.FromNode)
+        .Include(e => e.ToNode)
+        .Where(e => e.CampusId == campusId)
+        .ToListAsync();
     }
 
     public async Task<IEnumerable<Edge>> GetByNodeAsync(int nodeId)

@@ -1,5 +1,5 @@
+using API.DTOs;
 using API.Entities;
-using NetTopologySuite.Geometries;
 using Route = API.Entities.Route;
 
 namespace API.Interfaces;
@@ -7,5 +7,5 @@ namespace API.Interfaces;
 public interface IRouteService
 {
     List<Route> GetShortestPath(IReadOnlyList<Edge> navigableEdges, IEnumerable<Node> fromEntrances, IEnumerable<Node> toEntrances);
-    List<Tuple<Point, string>> GetRouteGuides(Route route);
+    List<RouteGuideDto> GetRouteGuides(Route route);
 }

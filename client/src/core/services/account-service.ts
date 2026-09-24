@@ -6,6 +6,7 @@ import { User } from '../../types/user';
 import { environment } from '../../environments/environment';
 import { BaseService } from './base-service';
 import { University } from '../../types/university';
+import { Building } from '../../types/building';
 
 export const SystemAdminRole = 'SystemAdmin';
 export const UniversityAdminRole = 'UniversityAdmin';
@@ -17,7 +18,10 @@ export type Role = typeof SystemAdminRole | typeof UniversityAdminRole | typeof 
 @Injectable({ providedIn: 'root' })
 export class AccountService extends BaseService {
   private readonly storageKey = 'varsitymaps-user';
+  private readonly recentSearchesKey = 'varsitymaps-recent-searches';
+
   readonly currentUser = signal<User | null>(null);
+  readonly recentSearches = signal<Building[]>([]);
 
   constructor() {
     super();
@@ -85,42 +89,79 @@ export class AccountService extends BaseService {
     this.clearUser();
   }
 
+  addRecentSearch(building: Building): void {
+    const user = this.currentUser();
+    if (!user || !user.campusId) return;
+
+    const campusId = user.campusId;
+    const map = this.getRecentSearchesMap();
+    const currentList = map[campusId] || [];
+
+    const filtered = currentList.filter(b => b.buildingId !== building.buildingId);
+    const updated = [building, ...filtered].slice(0, 5);
+
+    map[campusId] = updated;
+    window.localStorage.setItem(this.recentSearchesKey, JSON.stringify(map));
+
+    this.recentSearches.set(updated);
+  }
+
   private setAuthenticatedUser(user: User): User {
     const authenticatedUser: User = {
       ...user,
       roles: user.roles?.length ? user.roles : this.extractRoles(user)
     };
+
     this.currentUser.set(authenticatedUser);
     window.localStorage.setItem(this.storageKey, JSON.stringify(authenticatedUser));
+
+    this.syncRecentSearchesForCampus(user.campusId);
+
     return authenticatedUser;
   }
 
   private clearUser(): void {
     this.currentUser.set(null);
+    this.recentSearches.set([]);
     window.localStorage.removeItem(this.storageKey);
   }
 
   private loadFromStorage(): void {
     const stored = window.localStorage.getItem(this.storageKey);
-    if (!stored) {
-      return;
-    }
+    if (!stored) return;
 
     try {
       const parsed = JSON.parse(stored) as User;
       if (parsed?.token) {
         this.currentUser.set(parsed);
+        this.syncRecentSearchesForCampus(parsed.campusId);
       }
     } catch {
       this.clearUser();
     }
   }
 
+  private syncRecentSearchesForCampus(campusId: number | null): void {
+    if (!campusId) {
+      this.recentSearches.set([]);
+      return;
+    }
+    const map = this.getRecentSearchesMap();
+    this.recentSearches.set(map[campusId] || []);
+  }
+
+  private getRecentSearchesMap(): Record<number, Building[]> {
+    try {
+      const stored = window.localStorage.getItem(this.recentSearchesKey);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  }
+
   private extractRoles(user: User): string[] {
     const token = user.token;
-    if (!token) {
-      return [];
-    }
+    if (!token) return [];
 
     try {
       const model = JSON.parse(atob(token.split('.')[1]));

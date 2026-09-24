@@ -5,7 +5,7 @@
       <p class="text-xs text-base-content/60">{{ accountService.currentUser()?.email }}</p>
     </div>
 
-    @if (!isPlanningRoute()) {
+    @if (!isPlanningRoute() && !isNavigating()) {
       <button class="btn btn-primary btn-sm" (click)="startPlanningRoute()">Get Directions</button>
     }
   </div>
@@ -13,7 +13,39 @@
   <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
     <div class="rounded-box border border-base-300 bg-base-100 p-3 flex flex-col min-h-0 shadow-sm">
 
-      @if (isPlanningRoute()) {
+      <!-- Active Navigation Interface -->
+      @if (isNavigating()) {
+        <div class="space-y-4 flex-1 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="badge badge-success gap-2 py-3 w-full font-semibold">
+              <span>●</span> Active Navigation
+            </div>
+
+            <div class="p-3 bg-base-200 rounded-box border border-base-300">
+              <div class="text-xs text-base-content/60 uppercase font-bold tracking-wider">Destination</div>
+              <div class="font-bold text-base truncate">{{ destinationBuilding()?.name || 'Destination' }}</div>
+              <div class="text-xs text-success mt-1 font-medium">
+                {{ activeRoute().estimatedTravelTimeMinutes }} min ({{ activeRoute().distanceMeters | number:'1.0-0' }} m)
+              </div>
+            </div>
+
+            <div class="p-3 bg-primary/10 border border-primary/20 rounded-box space-y-1">
+              <div class="text-xs text-primary font-bold uppercase tracking-wider">Current Instruction</div>
+              <div class="text-sm font-semibold">{{ currentInstruction() }}</div>
+              <div class="text-xs text-base-content/70">
+                Distance Remaining: <span class="font-bold">{{ remainingRouteDistance() }} m</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-error btn-sm w-full mt-auto" (click)="promptEndNavigation()">
+            End Navigation
+          </button>
+        </div>
+      }
+
+      <!-- Planning Route Interface -->
+      @if (isPlanningRoute() && !isNavigating()) {
         <div class="space-y-2 mb-3 shrink-0">
           <button
             class="btn btn-sm w-full justify-start"
@@ -86,9 +118,18 @@
                       <span class="font-bold">Option {{ $index + 1 }}</span>
                       <span class="text-base-content/60 ml-2">{{ r.distanceMeters | number:'1.0-0' }} m</span>
                     </div>
-                    <span class="font-medium text-success">{{ r.estimatedWalkingTimeMinutes }} min</span>
+                    <span class="font-medium text-success">{{ r.estimatedTravelTimeMinutes }} min</span>
                   </div>
                 }
+              </div>
+
+              <div class="flex gap-2 pt-2">
+                <button class="btn btn-success btn-sm flex-1" (click)="startNavigation(true)">
+                  Start Nav (Mock)
+                </button>
+                <button class="btn btn-primary btn-sm flex-1" (click)="startNavigation(false)">
+                  Start Nav (Live)
+                </button>
               </div>
             </div>
           }
@@ -98,73 +139,75 @@
         <div class="divider my-0"></div>
       }
 
-      @if (recentSearches().length > 0) {
-        <div class="mb-3 shrink-0">
-          <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-1 px-1">
-            Recent Searches
+      @if (!isNavigating()) {
+        @if (this.accountService.recentSearches(); as recentSearches) {
+          <div class="mb-3 shrink-0">
+            <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-1 px-1">
+              Recent Searches
+            </div>
+            <div class="flex flex-wrap gap-1">
+              @for (b of recentSearches; track b.buildingId) {
+                <button class="btn btn-xs btn-ghost border border-base-300" (click)="selectBuilding(b.buildingId)">
+                  {{ b.name }}
+                </button>
+              }
+            </div>
           </div>
-          <div class="flex flex-wrap gap-1">
-            @for (b of recentSearches(); track b.buildingId) {
-              <button class="btn btn-xs btn-ghost border border-base-300" (click)="selectBuilding(b.buildingId)">
-                {{ b.name }}
-              </button>
-            }
-          </div>
+        }
+
+        <label class="input input-bordered input-sm flex items-center gap-2 mb-3 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+          <input
+            type="text"
+            class="grow"
+            placeholder="Search buildings…"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+          />
+        </label>
+
+        @if (!isPlanningRoute() && selectedBuilding(); as building) {
+          @if(building.name.toLowerCase().includes(searchQuery().toLowerCase())){
+            <div class="rounded-btn border border-primary bg-primary/5 p-3 mb-3 shrink-0 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-semibold text-sm">{{ building.name }}</span>
+                <span class="badge badge-ghost badge-xs">{{ building.alias }}</span>
+              </div>
+              @if (building.isAccessible) {
+                <span class="badge badge-success badge-xs">Accessible</span>
+              }
+            </div>
+          }
+        }
+
+        <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 px-1">
+          {{ filteredBuildings().length }} building(s)
+        </div>
+
+        <div class="overflow-y-auto flex-1 pr-1 space-y-1">
+          @for (building of filteredBuildings(); track building.buildingId) {
+            <div id="building-{{ building.buildingId }}"
+              class="flex items-center justify-between rounded-btn px-2 py-1.5 cursor-pointer text-sm transition-colors"
+              [class.bg-primary/10]="building.buildingId === selectedBuildingId() || building.buildingId === originBuildingId() || building.buildingId === destinationBuildingId()"
+              [class.hover:bg-base-200]="building.buildingId !== selectedBuildingId()"
+              (click)="selectBuilding(building.buildingId)"
+            >
+              <span class="truncate">{{ building.name }}</span>
+              <span class="badge badge-ghost badge-xs shrink-0">{{ building.alias }}</span>
+            </div>
+          } @empty {
+            <div class="text-sm text-base-content/50 py-8 text-center">
+              @if (searchQuery()) {
+                No buildings match "{{ searchQuery() }}".
+              } @else {
+                No buildings on this campus yet.
+              }
+            </div>
+          }
         </div>
       }
-
-      <label class="input input-bordered input-sm flex items-center gap-2 mb-3 shrink-0">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-        </svg>
-        <input
-          type="text"
-          class="grow"
-          placeholder="Search buildings…"
-          [value]="searchQuery()"
-          (input)="searchQuery.set($any($event.target).value)"
-        />
-      </label>
-
-      @if (!isPlanningRoute() && selectedBuilding(); as building) {
-        @if(building.name.toLowerCase().includes(searchQuery().toLowerCase())){
-          <div class="rounded-btn border border-primary bg-primary/5 p-3 mb-3 shrink-0 space-y-1.5">
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-sm">{{ building.name }}</span>
-              <span class="badge badge-ghost badge-xs">{{ building.alias }}</span>
-            </div>
-            @if (building.isAccessible) {
-              <span class="badge badge-success badge-xs">Accessible</span>
-            }
-          </div>
-        }
-      }
-
-      <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2 px-1">
-        {{ filteredBuildings().length }} building(s)
-      </div>
-
-      <div class="overflow-y-auto flex-1 pr-1 space-y-1">
-        @for (building of filteredBuildings(); track building.buildingId) {
-          <div
-            class="flex items-center justify-between rounded-btn px-2 py-1.5 cursor-pointer text-sm transition-colors"
-            [class.bg-primary/10]="building.buildingId === selectedBuildingId() || building.buildingId === originBuildingId() || building.buildingId === destinationBuildingId()"
-            [class.hover:bg-base-200]="building.buildingId !== selectedBuildingId()"
-            (click)="selectBuilding(building.buildingId)"
-          >
-            <span class="truncate">{{ building.name }}</span>
-            <span class="badge badge-ghost badge-xs shrink-0">{{ building.alias }}</span>
-          </div>
-        } @empty {
-          <div class="text-sm text-base-content/50 py-8 text-center">
-            @if (searchQuery()) {
-              No buildings match "{{ searchQuery() }}".
-            } @else {
-              No buildings on this campus yet.
-            }
-          </div>
-        }
-      </div>
     </div>
 
     <div class="relative w-full h-full min-h-0">
@@ -172,9 +215,27 @@
         [polygons]="mapPolygons()"
         [polylines]="routePolylines()"
         [center]="campusCenter()"
+        [isStudent]="true"
         (polygonClick)="selectBuilding($event)"
         (ready)="onMapReady($event)"
       />
     </div>
   </div>
 </section>
+
+<!-- Confirm End Session Modal -->
+@if (showEndConfirmModal()) {
+  <dialog class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">End Navigation Session?</h3>
+      <p class="py-4 text-sm">Are you sure you want to stop navigation? Active guidance progress will be lost.</p>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="cancelEndNavigation()">Cancel</button>
+        <button class="btn btn-error" (click)="confirmEndNavigation()">End Navigation</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" (click)="cancelEndNavigation()">
+      <button>close</button>
+    </form>
+  </dialog>
+}

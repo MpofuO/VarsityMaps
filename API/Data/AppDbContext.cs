@@ -14,7 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<Node> Nodes { get; set; }
     public DbSet<Edge> Edges { get; set; }
     public DbSet<Route> Routes { get; set; }
-    public DbSet<CheckPoint> Checkpoints { get; set; }
+    public DbSet<RouteGuide> RouteGuides { get; set; }
     public DbSet<Invitation> Invitations { get; set; }
     public DbSet<Application> Applications { get; set; }
 
@@ -30,7 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         builder.Entity<Node>().ToTable("Node");
         builder.Entity<Edge>().ToTable("Edge");
         builder.Entity<Route>().ToTable("Route");
-        builder.Entity<CheckPoint>().ToTable("CheckPoint");
+        builder.Entity<RouteGuide>().ToTable("RouteGuide");
         builder.Entity<Invitation>().ToTable("Invitation");
         builder.Entity<Application>().ToTable("Application");
 
@@ -96,9 +96,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.Entity<Route>()
-            .HasMany(r => r.CheckPoints)
-            .WithOne(c => c.Route)
-            .HasForeignKey(c => c.RouteId);
+            .HasMany(r => r.RouteGuides)
+            .WithOne(g => g.Route)
+            .HasForeignKey(g => g.RouteId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Invitation>()
             .HasOne(i => i.Campus)

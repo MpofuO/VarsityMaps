@@ -1,3 +1,4 @@
+using API.DTOs;
 using API.Entities;
 using API.Interfaces;
 using NetTopologySuite.Geometries;
@@ -53,7 +54,7 @@ public class RouteService : IRouteService
                     FromNodeId = candidate.FromId,
                     ToNodeId = candidate.ToId,
                     Weight = candidate.Weight,
-                    CheckPoints = []
+                    RouteGuides = []
                 });
             }
         }
@@ -61,12 +62,105 @@ public class RouteService : IRouteService
         return routes;
     }
 
-    public List<Tuple<Point, string>> GetRouteGuides(Route route)
+    public List<RouteGuideDto> GetRouteGuides(Route route)
     {
-        throw new NotImplementedException();
+        var guides = new List<RouteGuideDto>();
+        if (route?.Path?.Coordinates is null || route.Path.Coordinates.Length < 2)
+            return guides;
+
+        var coords = route.Path.Coordinates;
+        int stepIndex = 0;
+
+        guides.Add(new RouteGuideDto
+        {
+            StepIndex = stepIndex++,
+            Location = new Point(coords[0]) { SRID = 4326 },
+            Instruction = "Start your route"
+        });
+
+        for (int i = 1; i < coords.Length - 1; i++)
+        {
+            var prevCoord = coords[i - 1];
+            var currentCoord = coords[i];
+
+            double incomingBearing = CalculateBearing(prevCoord, currentCoord);
+            double outgoingBearing = CalculateBearing(currentCoord, coords[i + 1]);
+            double angleChange = GetAngularDifference(incomingBearing, outgoingBearing);
+
+            string instruction = ClassifyTurnInstruction(angleChange);
+
+            if (instruction != "Continue straight" && !instruction.Contains("Slight"))
+            {
+                var previousGuide = guides[^1];
+                previousGuide.Instruction = previousGuide.Instruction == "Start your route"
+                    ? $"Start your route. {instruction} ahead"
+                    : $"{instruction} ahead";
+            }
+
+            guides.Add(new RouteGuideDto
+            {
+                StepIndex = stepIndex++,
+                Location = new Point(currentCoord) { SRID = 4326 },
+                Instruction = instruction
+            });
+        }
+
+        // Destination instruction
+        guides.Add(new RouteGuideDto
+        {
+            StepIndex = stepIndex,
+            Location = new Point(coords[^1]) { SRID = 4326 },
+            Instruction = "Proceed to the entrance. You have arrived at your destination"
+        });
+
+        return guides;
     }
 
     #region Private Helper Methods
+    private static string ClassifyTurnInstruction(double angleChange)
+    {
+        if (Math.Abs(angleChange) < 20.0)
+            return "Continue straight";
+
+        if (angleChange >= 20.0 && angleChange < 45.0)
+            return "Slight right";
+
+        if (angleChange >= 45.0 && angleChange < 135.0)
+            return "Turn right";
+
+        if (angleChange <= -20.0 && angleChange > -45.0)
+            return "Slight left";
+
+        if (angleChange <= -45.0 && angleChange > -135.0)
+            return "Turn left";
+
+        return "Make a U-turn";
+    }
+
+    private double CalculateBearing(Coordinate start, Coordinate end)
+    {
+        double lat1 = DegreesToRadians(start.Y);
+        double lon1 = DegreesToRadians(start.X);
+        double lat2 = DegreesToRadians(end.Y);
+        double lon2 = DegreesToRadians(end.X);
+
+        double dLon = lon2 - lon1;
+
+        double y = Math.Sin(dLon) * Math.Cos(lat2);
+        double x = Math.Cos(lat1) * Math.Sin(lat2) - Math.Sin(lat1) * Math.Cos(lat2) * Math.Cos(dLon);
+
+        double bearing = RadiansToDegrees(Math.Atan2(y, x));
+        return (bearing + 360) % 360;
+    }
+
+    private double GetAngularDifference(double fromBearing, double toBearing)
+    {
+        double diff = (toBearing - fromBearing + 180) % 360 - 180;
+        return diff < -180 ? diff + 360 : diff;
+    }
+
+    private static double DegreesToRadians(double deg) => deg * (Math.PI / 180.0);
+    private static double RadiansToDegrees(double rad) => rad * (180.0 / Math.PI);
 
     private static Dictionary<int, List<(int NeighborId, decimal Weight)>> BuildAdjacency(IReadOnlyList<Edge> edges)
     {

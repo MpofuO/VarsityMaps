@@ -17,5 +17,5 @@ public class Route
     public int ToNodeId { get; set; }
     public int CampusId { get; set; }
     
-    public ICollection<CheckPoint> CheckPoints { get; set; } = [];
+    public ICollection<RouteGuide> RouteGuides { get; set; } = [];
 }

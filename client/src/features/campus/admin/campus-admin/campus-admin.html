@@ -44,15 +44,16 @@
 
     @if (activeTab() === 'nodes') {
     <app-campus-node [nodes]="nodes()" [isPlacingNodes]="mode() === 'place-nodes'" [selectedNodeId]="selectedNodeId()"
+      [isConnecting]="mode() === 'connect-nodes'" (startConnecting)="startConnecting()"
       (startPlacingNodes)="startPlacingNodes()" (selectNode)="selectNode($event)"
       (renameNode)="handleRenameNode($event)" (deleteNode)="handleDeleteNode($event)" />
     }
 
     @if (activeTab() === 'paths') {
-    <app-campus-paths [edges]="edges()" [nodes]="nodes()" [isConnecting]="mode() === 'connect-nodes'"
-      [isSelectingEdges]="mode() === 'select-edges'" [selectedEdgeId]="selectedEdgeId()"
-      [selectedEdgeIds]="selectedEdgeIds()" (startConnecting)="startConnecting()"
-      (startSelectingEdges)="startSelectingEdges()" (editSelectedEdges)="openBulkEdgeProperties()"
+    <app-campus-paths [edges]="edges()" [nodes]="nodes()" [isSelectingEdges]="mode() === 'select-edges'"
+      [isSelectingPathRange]="mode() === 'select-path-range'" [selectedEdgeId]="selectedEdgeId()"
+      [selectedEdgeIds]="selectedEdgeIds()" (startSelectingEdges)="startSelectingEdges()"
+      (startSelectingPathRange)="startSelectingPathRange()" (editSelectedEdges)="openBulkEdgeProperties()"
       (deleteSelectedEdges)="openBulkDeleteConfirm()" (pathEditClick)="onPolylineDblClick($event)"
       (selectEdge)="mode() === 'select-edges' ? toggleEdgeSelection($event) : selectEdge($event)" />
     }
@@ -140,7 +141,7 @@
 </section>
 
 <!-- Path Properties Modal -->
-<app-modal [isOpen]="isEdgePropertiesOpen()" (closeModal)="closeEdgeProperties()">
+<app-modal [isOpen]="isEdgePropertiesOpen()" (closeModal)="cancelMode()">
   <div class="space-y-6">
     <h3 class="font-bold text-lg">
       {{ isBulkEdit() ? 'Edit Multiple Paths (' + edgePropertiesTarget()?.ids?.length + ')' : 'Path Properties' }}
@@ -149,13 +150,15 @@
     @if (!isBulkEdit()) {
     <div class="form-control">
       <label class="label mb-1"><span class="label-text font-medium">Name (Optional)</span></label>
-      <input type="text" class="input input-bordered w-full" [value]="propertiesName()" (input)="propertiesName.set($any($event.target).value)" />
+      <input type="text" class="input input-bordered w-full" [value]="propertiesName()"
+        (input)="propertiesName.set($any($event.target).value)" />
     </div>
     }
 
     <div class="form-control">
       <label class="label cursor-pointer justify-start gap-3 py-1">
-        <input type="checkbox" class="checkbox checkbox-primary" [checked]="propertiesIsClosed()" (change)="propertiesIsClosed.set($any($event.target).checked)" />
+        <input type="checkbox" class="checkbox checkbox-primary" [checked]="propertiesIsClosed()"
+          (change)="propertiesIsClosed.set($any($event.target).checked)" />
         <span class="label-text font-medium">Closed</span>
       </label>
     </div>
@@ -166,15 +169,22 @@
         <span class="label-text font-medium">Closed Until</span>
         <span class="label-text-alt text-base-content/60">Leave empty if the closure duration is indefinite or permanent.</span>
       </label>
-      <input type="date" class="input input-bordered w-full" [value]="propertiesClosedUntil()" (input)="propertiesClosedUntil.set($any($event.target).value)" />
+      <input type="date" class="input input-bordered w-full" [value]="propertiesClosedUntil()"
+        (input)="propertiesClosedUntil.set($any($event.target).value)" />
     </div>
     }
 
     <div class="form-control">
-      <label class="label mb-1"><span class="label-text font-medium">Allowed Travel Modes</span></label>
-      <div class="flex flex-wrap gap-2 pt-1">
+      <label class="label flex-col items-start gap-0.5 mb-1">
+        <span class="label-text font-medium" [class.opacity-50]="propertiesIsClosed()">Allowed Travel Modes</span>
+      </label>
+      <div class="flex flex-wrap gap-2 pt-1" [class.opacity-50]="propertiesIsClosed()">
         @for (opt of travelModeOptions; track opt.value) {
-        <button type="button" class="btn btn-xs rounded-full px-3 py-1" [class.btn-primary]="propertiesTravelModes().has(opt.value)" [class.btn-outline]="!propertiesTravelModes().has(opt.value)" (click)="toggleTravelMode(opt.value)">
+        <button type="button" class="btn btn-xs rounded-full px-3 py-1"
+          [disabled]="propertiesIsClosed()"
+          [class.btn-primary]="propertiesTravelModes().has(opt.value)"
+          [class.btn-outline]="!propertiesTravelModes().has(opt.value)" 
+          (click)="toggleTravelMode(opt.value)">
           {{ opt.label }}
         </button>
         }
@@ -185,8 +195,23 @@
       @if (!isBulkEdit()) {
       <button class="btn btn-error btn-sm" (click)="deleteEdgeProperties()">Delete Path</button>
       }
-      <button class="btn btn-ghost btn-sm" (click)="closeEdgeProperties()">Cancel</button>
+      <button class="btn btn-ghost btn-sm" (click)="cancelMode()">Cancel</button>
       <button class="btn btn-primary btn-sm" (click)="saveEdgeProperties()">Save Changes</button>
+    </div>
+  </div>
+</app-modal>
+
+<!-- Entrance Modal -->
+<app-modal [isOpen]="isEntranceConfirmOpen()" title="Add entrance" (closed)="isEntranceConfirmOpen.set(false)">
+  <div class="space-y-4">
+    <p class="text-sm">Add an entrance node here for <span class="font-semibold">{{ entranceTargetBuilding()?.name
+        }}</span>?</p>
+    <input class="input input-bordered input-sm w-full" placeholder="Entrance name (e.g. Main Entrance)"
+      [value]="entranceName()" (input)="entranceName.set($any($event.target).value)" />
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="isEntranceConfirmOpen.set(false)">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!entranceName().trim()"
+        (click)="confirmEntrance()">Add entrance</button>
     </div>
   </div>
 </app-modal>

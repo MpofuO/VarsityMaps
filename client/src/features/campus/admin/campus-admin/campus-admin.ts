@@ -22,7 +22,9 @@ import { CanComponentDeactivate } from '../../../../core/guards/unsaved-changes-
 import { Observable, Subject, take } from 'rxjs';
 // #endregion
 
-type EditorMode = 'view' | 'draw-building' | 'place-nodes' | 'place-entrance' | 'connect-nodes' | 'select-edges';
+type EditorMode = 'view' | 'draw-building'
+  | 'place-nodes' | 'place-entrance' | 'connect-nodes'
+  | 'select-edges' | 'select-path-range';
 type EditorTab = 'buildings' | 'nodes' | 'paths';
 
 @Component({
@@ -129,6 +131,9 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly connectSecondNodeId = signal<number | null>(null);
   protected readonly selectedEdgeId = signal<number | null>(null);
   protected readonly selectedEdgeIds = signal<Set<number>>(new Set());
+
+  protected readonly rangeStartNodeId = signal<number | null>(null);
+  protected readonly rangeEndNodeId = signal<number | null>(null);
 
   protected readonly edgePropertiesTarget = signal<{ ids: number[] } | null>(null);
   protected readonly isEdgePropertiesOpen = signal(false);
@@ -265,8 +270,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.draftEntrancePoint.set(null);
     this.connectFirstNodeId.set(null);
     this.connectSecondNodeId.set(null);
+    this.rangeStartNodeId.set(null);
+    this.rangeEndNodeId.set(null);
     this.selectedEdgeIds.set(new Set());
-    this.closeEdgeProperties();
+    this.isEdgePropertiesOpen.set(false);
+    this.edgePropertiesTarget.set(null);
     this.isBulkDeleteConfirmOpen.set(false);
   }
   // #endregion
@@ -278,6 +286,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   onMapClick(latLng: google.maps.LatLng): void {
     const point = { lat: latLng.lat(), lng: latLng.lng() };
+
 
     if (this.mode() === 'draw-building') {
       const path = this.draftPath();
@@ -310,20 +319,18 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
 
   onMarkerClick(nodeId: number): void {
-    if (this.activeTab() === 'nodes') {
-      if (this.mode() === 'place-nodes') {
-        const node = this.nodes().find((n) => n.nodeId === nodeId);
-        if (!node) return;
-        const point = { lat: node.location.coordinates[1], lng: node.location.coordinates[0] };
-        const nextPath = [...this.draftNodePath(), { point, existingNodeId: nodeId }];
-        this.draftNodePath.set(nextPath);
-        this.renderDraftPolyline(nextPath.map((p) => p.point));
-        this.finishPlacingNodes();
-        return;
-      }
-      this.selectNode(nodeId);
+    if (this.mode() === 'place-nodes') {
+      const node = this.nodes().find((n) => n.nodeId === nodeId);
+      if (!node) return;
+      const point = { lat: node.location.coordinates[1], lng: node.location.coordinates[0] };
+      const nextPath = [...this.draftNodePath(), { point, existingNodeId: nodeId }];
+      this.draftNodePath.set(nextPath);
+      this.renderDraftPolyline(nextPath.map((p) => p.point));
+      this.finishPlacingNodes();
+      return;
     }
-    if (this.mode() === 'connect-nodes') {
+    else if (this.mode() === 'connect-nodes') {
+      this.selectedNodeId.set(null);
       const first = this.connectFirstNodeId();
       if (first === null) {
         this.connectFirstNodeId.set(nodeId);
@@ -338,10 +345,49 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         this.toastService.error('These nodes are already connected.');
         return;
       }
-
       this.connectSecondNodeId.set(nodeId);
       return;
     }
+    if (this.mode() === 'select-path-range') {
+      const start = this.rangeStartNodeId();
+      if (start === null) {
+        this.rangeStartNodeId.set(nodeId);
+        this.selectNode(nodeId);
+        this.toastService.info('Start node selected. Now pick the end node.');
+        return;
+      }
+
+      if (start === nodeId) {
+        this.toastService.error('Start and end nodes must be different.');
+        return;
+      }
+
+      this.rangeEndNodeId.set(nodeId);
+
+      this.edgeService.getPathEdges(start, nodeId).subscribe({
+        next: (edgeIds) => {
+          this.selectNode(start);
+          if (!edgeIds || edgeIds.length === 0) {
+            this.toastService.error('No connected route exists between these nodes.');
+            return;
+          }
+
+          const updated = new Set([...this.selectedEdgeIds(), ...edgeIds]);
+          this.selectedEdgeIds.set(updated);
+
+          this.toastService.info('Shortest route path was chosen and added to selection.');
+          this.mode.set('select-edges');
+        },
+        error: () => {
+          this.toastService.error('Unable to find a valid route between these nodes.');
+          this.rangeEndNodeId.set(null);
+        }
+      });
+      return;
+    }
+
+    if (this.activeTab() === 'nodes')
+      this.selectNode(nodeId);
   }
 
   private isPointInAnyBuilding(point: google.maps.LatLngLiteral): boolean {
@@ -356,6 +402,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   onBuildingDblClick(id: number): void {
     if (this.activeTab() === 'buildings') {
+      this.selectedBuildingId.set(id);
       this.buildingsChild?.openEditFromParent(id);
     }
   }
@@ -639,6 +686,13 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     }
   }
 
+  startSelectingPathRange(): void {
+    this.mode.set('select-path-range');
+    this.selectedEdgeId.set(null);
+    this.rangeStartNodeId.set(null);
+    this.rangeEndNodeId.set(null);
+  }
+
   private encodeTravelModes(modes: Set<TravelMode>): number {
     let value = 0;
     for (const m of modes) value |= m;
@@ -672,25 +726,49 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
 
   openBulkEdgeProperties(): void {
-    const ids = Array.from(this.selectedEdgeIds());
-    if (ids.length === 0) return;
+  const ids = Array.from(this.selectedEdgeIds());
+  if (ids.length === 0) return;
 
-    this.edgePropertiesTarget.set({ ids });
-    this.propertiesName.set('');
-    this.propertiesIsClosed.set(false);
-    this.propertiesClosedUntil.set('');
-    this.propertiesTravelModes.set(new Set([TravelMode.Walking]));
-    this.isEdgePropertiesOpen.set(true);
+  const selectedEdges = this.edges().filter((e) => this.selectedEdgeIds().has(e.edgeId));
+
+  const allClosed = selectedEdges.length > 0 && selectedEdges.every((e) => e.isClosed || e.isEffectivelyClosed);
+  this.propertiesIsClosed.set(allClosed);
+
+  const commonModes = new Set<TravelMode>();
+
+  if (selectedEdges.length > 0) {
+    const availableModes = [
+      TravelMode.Walking, 
+      TravelMode.Cycling, 
+      TravelMode.Bus, 
+      TravelMode.Car
+    ];
+
+    for (const mode of availableModes) {
+      const isAvailableInAll = selectedEdges.every(
+        (e) => (e.travelModes & mode) === mode
+      );
+
+      if (isAvailableInAll) {
+        commonModes.add(mode);
+      }
+    }
   }
+
+  if (commonModes.size === 0) {
+    commonModes.add(TravelMode.Walking);
+  }
+
+  this.edgePropertiesTarget.set({ ids });
+  this.propertiesName.set('');
+  this.propertiesClosedUntil.set('');
+  this.propertiesTravelModes.set(commonModes);
+  this.isEdgePropertiesOpen.set(true);
+}
 
   openBulkDeleteConfirm(): void {
     if (this.selectedEdgeIds().size === 0) return;
     this.isBulkDeleteConfirmOpen.set(true);
-  }
-
-  closeEdgeProperties(): void {
-    this.isEdgePropertiesOpen.set(false);
-    this.edgePropertiesTarget.set(null);
   }
 
   saveEdgeProperties(): void {
@@ -709,7 +787,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       }).subscribe({
         next: () => {
           this.toastService.success('Path updated.');
-          this.closeEdgeProperties();
           this.cancelMode();
           this.load();
         }
@@ -718,7 +795,6 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       this.edgeService.bulkUpdateEdges(target.ids, this.propertiesIsClosed(), closedUntil, travelModes).subscribe({
         next: () => {
           this.toastService.success(`${target.ids.length} paths updated.`);
-          this.closeEdgeProperties();
           this.cancelMode();
           this.load();
         }
@@ -730,7 +806,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     const target = this.edgePropertiesTarget();
     if (!target || target.ids.length !== 1) return;
     this.handleDeleteEdge(target.ids[0]);
-    this.closeEdgeProperties();
+    this.cancelMode();
   }
 
   handleDeleteEdge(id: number): void {

@@ -4,7 +4,7 @@ export interface RouteResult {
   routeId: number;
   path: GeoLineString;
   distanceMeters: number;
-  estimatedWalkingTimeMinutes: number;
+  estimatedTravelTimeMinutes: number;
   fromBuildingId: number;
   toBuildingId: number;
   travelMode: number;

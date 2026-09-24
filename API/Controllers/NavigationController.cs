@@ -19,20 +19,33 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         [FromQuery] int toBuildingId,
         [FromQuery] TravelMode mode = TravelMode.Walking)
     {
-        if (fromBuildingId == toBuildingId) 
+        if (fromBuildingId == toBuildingId)
             return BadRequest("Origin and destination must be different buildings.");
 
         var (campusId, isGuest) = await User.GetNavigationContextAsync(userManager, uow);
-        if (campusId == 0) 
+        if (campusId == 0)
             return BadRequest("No active campus set for this user.");
 
         var fromBuilding = await uow.BuildingRepository.GetByIdAsync(fromBuildingId);
         var toBuilding = await uow.BuildingRepository.GetByIdAsync(toBuildingId);
-        if (fromBuilding is null || toBuilding is null) 
+        if (fromBuilding is null || toBuilding is null)
             return BadRequest("Invalid building(s) specified.");
 
         if (fromBuilding.CampusId != campusId || toBuilding.CampusId != campusId)
             return BadRequest("Both buildings must belong to the campus you're currently viewing.");
+
+        var cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(fromBuildingId, toBuildingId, mode);
+        if (cachedRoutes.Count > 0)
+        {
+            foreach (var cachedRoute in cachedRoutes)
+            {
+                cachedRoute.SearchCount++;
+                cachedRoute.LastRetrieved = DateTime.UtcNow;
+            }
+
+            await uow.CompleteAsync();
+            return Ok(cachedRoutes.Select(route => route.ToDto()));
+        }
 
         var navigableEdges = isGuest
             ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, mode)
@@ -47,7 +60,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
             return BadRequest("One or both buildings have no registered entrances.");
 
         var routes = routeService.GetShortestPath(navigableEdges, fromEntrances, toEntrances);
-        if (routes is null || !routes.Any()) 
+        if (routes is null || !routes.Any())
             return BadRequest($"No {mode.ToString().ToLower()} route could be found between the specified buildings.");
 
         foreach (var route in routes)
@@ -65,5 +78,78 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         await uow.CompleteAsync();
 
         return Ok(routes.Select(r => r.ToDto()));
+    }
+
+    [HttpGet("route-guides/{routeId}")]
+    public async Task<ActionResult<IEnumerable<RouteGuideDto>>> GetRouteGuides(int routeId)
+    {
+        var route = await uow.RouteRepository.GetWithRouteGuidesAsync(routeId);
+        if (route is null)
+            return NotFound("Route not found.");
+
+        if (route.RouteGuides.Count == 0)
+        {
+            route.RouteGuides = routeService.GetRouteGuides(route)
+                .Select(guide => new RouteGuide
+                {
+                    StepIndex = guide.StepIndex,
+                    Location = guide.Location,
+                    Instruction = guide.Instruction
+                })
+                .ToList();
+
+            await uow.CompleteAsync();
+        }
+
+        return Ok(route.RouteGuides
+            .OrderBy(guide => guide.StepIndex)
+            .Select(guide => guide.ToDto()));
+    }
+
+    [HttpGet("path-edges")]
+    [Authorize(Policy = "RequireCampusAdminRole")]
+    public async Task<ActionResult<IEnumerable<int>>> GetPathEdges([FromQuery] int startNodeId, [FromQuery] int endNodeId)
+    {
+        if (startNodeId == endNodeId)
+            return BadRequest("Start and end nodes must be different.");
+
+        var (campusId, _) = await User.GetNavigationContextAsync(userManager, uow);
+        if (campusId == 0)
+            return BadRequest("No active campus set for this user.");
+
+        var campusEdges = await uow.EdgeRepository.GetByCampusAsync(campusId);
+
+        var startNode = await uow.NodeRepository.GetByIdAsync(startNodeId);
+        var endNode = await uow.NodeRepository.GetByIdAsync(endNodeId);
+        if (startNode is null || endNode is null)
+            return BadRequest("Invalid node(s) specified.");
+
+        var routes = routeService.GetShortestPath(campusEdges.ToList(), [startNode], [endNode]);
+        if (routes is null || !routes.Any())
+            return NotFound("No route path could be found between the specified nodes.");
+
+        var shortestRoute = routes.OrderBy(r => r.Weight).First();
+
+        var edgeIds = new List<int>();
+        var coords = shortestRoute.Path.Coordinates;
+
+        for (int i = 0; i < coords.Length - 1; i++)
+        {
+            var c1 = coords[i];
+            var c2 = coords[i + 1];
+
+            var matchingEdge = campusEdges.FirstOrDefault(e =>
+                (Math.Abs(e.FromNode.Location.X - c1.X) < 1e-6 && Math.Abs(e.FromNode.Location.Y - c1.Y) < 1e-6 &&
+                 Math.Abs(e.ToNode.Location.X - c2.X) < 1e-6 && Math.Abs(e.ToNode.Location.Y - c2.Y) < 1e-6) ||
+                (Math.Abs(e.FromNode.Location.X - c2.X) < 1e-6 && Math.Abs(e.FromNode.Location.Y - c2.Y) < 1e-6 &&
+                 Math.Abs(e.ToNode.Location.X - c1.X) < 1e-6 && Math.Abs(e.ToNode.Location.Y - c1.Y) < 1e-6));
+
+            if (matchingEdge != null)
+            {
+                edgeIds.Add(matchingEdge.EdgeId);
+            }
+        }
+
+        return Ok(edgeIds);
     }
 }
