@@ -15,7 +15,6 @@ public class RouteService : IRouteService
         var routes = new List<Route>();
         var graph = BuildAdjacency(navigableEdges);
 
-        // Collect candidate paths across all entrance pairs
         var candidatePaths = new List<(decimal Weight, int FromId, int ToId, List<Node> Path)>();
 
         foreach (var from in fromEntrances)
@@ -33,10 +32,8 @@ public class RouteService : IRouteService
             }
         }
 
-        // Sort candidates by total distance ascending
         candidatePaths = candidatePaths.OrderBy(c => c.Weight).ToList();
 
-        // Distinct route tracking (to eliminate duplicate geometry paths)
         var seenGeometries = new HashSet<string>();
 
         foreach (var candidate in candidatePaths)
@@ -44,7 +41,7 @@ public class RouteService : IRouteService
             if (routes.Count >= MaxRoutes) break;
 
             var lineString = BuildLineString(candidate.Path);
-            var geoKey = lineString.ToText(); // WKT string representation for deduplication
+            var geoKey = lineString.ToText();
 
             if (seenGeometries.Add(geoKey))
             {
@@ -62,6 +59,44 @@ public class RouteService : IRouteService
         return routes;
     }
 
+    public List<Route> GetMultiLegPath(IReadOnlyList<Edge> drivingEdges, IReadOnlyList<Edge> walkingEdges,
+        IEnumerable<Node> originEntrances, IEnumerable<Node> destinationEntrances, IEnumerable<Node> parkingAccessNodes)
+    {
+        if (!parkingAccessNodes.Any())
+            return [];
+
+        var vehicularLeg = GetShortestPath(drivingEdges, originEntrances, parkingAccessNodes);
+        if (!vehicularLeg.Any()) return [];
+
+        var walkingLeg = GetShortestPath(walkingEdges, parkingAccessNodes, destinationEntrances);
+        if (!walkingLeg.Any()) return [];
+
+        var multiLegRoutes = new List<Route>();
+
+        foreach (var vLeg in vehicularLeg)
+        {
+            var matchingWalkLeg = walkingLeg.FirstOrDefault(w => w.FromNodeId == vLeg.ToNodeId);
+            if (matchingWalkLeg == null) continue;
+
+            var vCoords = vLeg.Path.Coordinates;
+            var wCoords = matchingWalkLeg.Path.Coordinates;
+            var combinedCoords = vCoords.Concat(wCoords.Skip(1)).ToArray();
+
+            multiLegRoutes.Add(new Route
+            {
+                Path = new LineString(combinedCoords),
+                FromNodeId = vLeg.FromNodeId,
+                ToNodeId = matchingWalkLeg.ToNodeId,
+                Weight = vLeg.Weight + matchingWalkLeg.Weight,
+                RouteGuides = []
+            });
+
+            if (multiLegRoutes.Count >= MaxRoutes) break;
+        }
+
+        return multiLegRoutes;
+    }
+
     public List<RouteGuideDto> GetRouteGuides(Route route)
     {
         var guides = new List<RouteGuideDto>();
@@ -75,7 +110,12 @@ public class RouteService : IRouteService
         {
             StepIndex = stepIndex++,
             Location = new Point(coords[0]) { SRID = 4326 },
-            Instruction = "Start your route"
+            Instruction = route.TravelMode switch
+            {
+                TravelMode.Car => "Start driving towards your destination parking area",
+                TravelMode.Bus => "Board the bus towards your destination parking area",
+                _ => "Start walking towards your destination"
+            }
         });
 
         for (int i = 1; i < coords.Length - 1; i++)
@@ -92,8 +132,8 @@ public class RouteService : IRouteService
             if (instruction != "Continue straight" && !instruction.Contains("Slight"))
             {
                 var previousGuide = guides[^1];
-                previousGuide.Instruction = previousGuide.Instruction == "Start your route"
-                    ? $"Start your route. {instruction} ahead"
+                previousGuide.Instruction = previousGuide.Instruction.StartsWith("Start")
+                    ? $"{previousGuide.Instruction}. {instruction} ahead"
                     : $"{instruction} ahead";
             }
 
@@ -105,7 +145,6 @@ public class RouteService : IRouteService
             });
         }
 
-        // Destination instruction
         guides.Add(new RouteGuideDto
         {
             StepIndex = stepIndex,

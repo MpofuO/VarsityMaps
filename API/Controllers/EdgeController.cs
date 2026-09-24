@@ -39,10 +39,13 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
             ?? await uow.EdgeRepository.GetByNodesAsync(toNodeId, fromNodeId);
         if (duplicate is not null) return BadRequest("These nodes are already connected.");
 
-        var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
         var segment = new LineString(new[] { fromNode.Location.Coordinate, toNode.Location.Coordinate });
-        if (buildings.Any(b => b.Boundary.Intersects(segment)))
-            return BadRequest("This path crosses a building — adjust the route.");
+
+        // Only block edges that intersect buildings which DO NOT allow passage.
+        // Buildings with AllowsPassage = true and all ParkingAreas are allowed.
+        var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
+        if (buildings.Any(b => !b.AllowsPassage && b.Boundary.Intersects(segment)))
+            return BadRequest("This path crosses a building that does not allow passage — adjust the route.");
 
         var degreeDistance = fromNode.Location.Distance(toNode.Location);
 

@@ -5,6 +5,7 @@ public interface IUnitOfWork
     IUniversityRepository UniversityRepository { get; }
     ICampusRepository CampusRepository { get; }
     IBuildingRepository BuildingRepository { get; }
+    IParkingAreaRepository ParkingAreaRepository { get; }
     INodeRepository NodeRepository { get; }
     IEdgeRepository EdgeRepository { get; }
     IRouteRepository RouteRepository { get; }

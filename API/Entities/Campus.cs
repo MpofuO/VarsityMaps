@@ -14,5 +14,6 @@ public class Campus
     
     public ICollection<Building> Buildings { get; set; } = [];
     public ICollection<Node> Nodes { get; set; } = [];
+    public ICollection<ParkingArea> ParkingAreas { get; set; } = [];
     public ICollection<Invitation> Invitations { get; set; } = [];
 }

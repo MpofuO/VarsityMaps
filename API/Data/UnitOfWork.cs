@@ -14,6 +14,7 @@ public class UnitOfWork : IUnitOfWork
         UniversityRepository = new UniversityRepository(_context);
         CampusRepository = new CampusRepository(_context);
         BuildingRepository = new BuildingRepository(_context);
+        ParkingAreaRepository = new ParkingAreaRepository(_context);
         NodeRepository = new NodeRepository(_context);
         EdgeRepository = new EdgeRepository(_context);
         RouteRepository = new RouteRepository(_context);
@@ -25,6 +26,7 @@ public class UnitOfWork : IUnitOfWork
     public IUniversityRepository UniversityRepository { get; }
     public ICampusRepository CampusRepository { get; }
     public IBuildingRepository BuildingRepository { get; }
+    public IParkingAreaRepository ParkingAreaRepository { get; }
     public INodeRepository NodeRepository { get; }
     public IEdgeRepository EdgeRepository { get; }
     public IRouteRepository RouteRepository { get; }

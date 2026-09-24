@@ -9,6 +9,7 @@ public class Building
     public string Alias { get; set; } = string.Empty;
     public bool IsAccessible { get; set; }
     public bool IsGuestAccessible { get; set; }
+    public bool AllowsPassage { get; set; } = false;
     public required Polygon Boundary { get; set; }
 
     public int CampusId { get; set; }

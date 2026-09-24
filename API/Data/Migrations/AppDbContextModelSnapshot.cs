@@ -150,6 +150,9 @@ namespace API.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("AllowsPassage")
+                        .HasColumnType("bit");
+
                     b.Property<Polygon>("Boundary")
                         .IsRequired()
                         .HasColumnType("geometry");
@@ -319,13 +322,50 @@ namespace API.Data.Migrations
                     b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("ParkingAreaId")
+                        .HasColumnType("int");
+
                     b.HasKey("NodeId");
 
                     b.HasIndex("BuildingId");
 
                     b.HasIndex("CampusId");
 
+                    b.HasIndex("ParkingAreaId");
+
                     b.ToTable("Node", (string)null);
+                });
+
+            modelBuilder.Entity("API.Entities.ParkingArea", b =>
+                {
+                    b.Property<int>("ParkingAreaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ParkingAreaId"));
+
+                    b.Property<Polygon>("Boundary")
+                        .IsRequired()
+                        .HasColumnType("geometry");
+
+                    b.Property<int>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsAccessible")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsGuestAccessible")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ParkingAreaId");
+
+                    b.HasIndex("CampusId");
+
+                    b.ToTable("ParkingArea", (string)null);
                 });
 
             modelBuilder.Entity("API.Entities.Route", b =>
@@ -620,7 +660,24 @@ namespace API.Data.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("API.Entities.ParkingArea", "ParkingArea")
+                        .WithMany("AccessNodes")
+                        .HasForeignKey("ParkingAreaId");
+
                     b.Navigation("Building");
+
+                    b.Navigation("Campus");
+
+                    b.Navigation("ParkingArea");
+                });
+
+            modelBuilder.Entity("API.Entities.ParkingArea", b =>
+                {
+                    b.HasOne("API.Entities.Campus", "Campus")
+                        .WithMany("ParkingAreas")
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Campus");
                 });
@@ -699,6 +756,8 @@ namespace API.Data.Migrations
                     b.Navigation("Invitations");
 
                     b.Navigation("Nodes");
+
+                    b.Navigation("ParkingAreas");
                 });
 
             modelBuilder.Entity("API.Entities.Node", b =>
@@ -706,6 +765,11 @@ namespace API.Data.Migrations
                     b.Navigation("IncomingEdges");
 
                     b.Navigation("OutgoingEdges");
+                });
+
+            modelBuilder.Entity("API.Entities.ParkingArea", b =>
+                {
+                    b.Navigation("AccessNodes");
                 });
 
             modelBuilder.Entity("API.Entities.Route", b =>
