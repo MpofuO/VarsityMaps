@@ -55,6 +55,37 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         return Ok(node.ToDto());
     }
 
+    [HttpPost("parking-area/{parkingAreaId:int}")]
+    public async Task<ActionResult<NodeDto>> AddParkingAccessNode(int parkingAreaId, NodeDto nodeDto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
+        var parkingArea = await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId);
+        if (parkingArea is null || parkingArea.CampusId != callerCampusId)
+            return NotFound("Parking area not found.");
+
+        if (parkingArea.Boundary.Contains(nodeDto.Location))
+            return BadRequest("Parking access node cannot be placed inside the parking area.");
+
+        var distance = parkingArea.Boundary.Distance(nodeDto.Location);
+        var distanceMeters = GeoHelper.DegreeDistanceToMeters(distance, nodeDto.Location.Y);
+        if (distanceMeters > 5)
+            return BadRequest($"Parking access node must be within 5 meters of the parking area boundary (currently {distanceMeters:F1}m away).");
+
+        var node = new Node
+        {
+            Name = nodeDto.Name,
+            Location = nodeDto.Location,
+            CampusId = callerCampusId,
+            ParkingAreaId = parkingAreaId
+        };
+
+        await uow.NodeRepository.CreateAsync(node);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to add parking access node.");
+        return Ok(node.ToDto());
+    }
+
     [HttpPost]
     public async Task<ActionResult<IReadOnlyList<NodeDto>>> AddNodes(AddNodeDto dto)
     {

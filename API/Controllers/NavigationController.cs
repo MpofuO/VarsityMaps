@@ -123,12 +123,21 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
 
         if (route.RouteGuides.Count == 0)
         {
-            route.RouteGuides = routeService.GetRouteGuides(route)
+            string? parkingAreaName = null;
+            if (route.TransitionParkingAreaId is int parkingAreaId)
+            {
+                parkingAreaName = (await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId))?.Name;
+            }
+
+            route.RouteGuides = routeService.GetRouteGuides(route, parkingAreaName)
                 .Select(guide => new RouteGuide
                 {
                     StepIndex = guide.StepIndex,
                     Location = guide.Location,
-                    Instruction = guide.Instruction
+                    Instruction = guide.Instruction,
+                    TravelMode = guide.TravelMode,
+                    IsTransition = guide.IsTransition,
+                    ParkingAreaId = guide.ParkingAreaId
                 })
                 .ToList();
 

@@ -63,6 +63,19 @@ public static class DtoExtensions
         };
     }
 
+    public static ParkingAreaDto ToDto(this ParkingArea parkingArea)
+    {
+        return new ParkingAreaDto
+        {
+            ParkingAreaId = parkingArea.ParkingAreaId,
+            Name = parkingArea.Name,
+            IsAccessible = parkingArea.IsAccessible,
+            IsGuestAccessible = parkingArea.IsGuestAccessible,
+            Boundary = parkingArea.Boundary,
+            AccessNodeIds = parkingArea.AccessNodes.Select(n => n.NodeId).ToList()
+        };
+    }
+
     public static NodeDto ToDto(this Node node)
     {
         return new NodeDto
@@ -70,7 +83,8 @@ public static class DtoExtensions
             NodeId = node.NodeId,
             Name = node.Name!,
             Location = node.Location,
-            BuildingId = node.BuildingId
+            BuildingId = node.BuildingId,
+            ParkingAreaId = node.ParkingAreaId
         };
     }
 
@@ -125,7 +139,9 @@ public static class DtoExtensions
             EstimatedTravelTimeMinutes = Math.Max(1, (int)Math.Round(estimatedMinutes)),
             FromBuildingId = route.FromBuildingId,
             ToBuildingId = route.ToBuildingId,
-            TravelMode = route.TravelMode
+            TravelMode = route.TravelMode,
+            TransitionParkingAreaId = route.TransitionParkingAreaId,
+            TransitionLocation = route.TransitionLocation
         };
     }
 
@@ -135,7 +151,10 @@ public static class DtoExtensions
         {
             StepIndex = guide.StepIndex,
             Location = guide.Location,
-            Instruction = guide.Instruction
+            Instruction = guide.Instruction,
+            TravelMode = guide.TravelMode,
+            IsTransition = guide.IsTransition,
+            ParkingAreaId = guide.ParkingAreaId
         };
     }
 }

@@ -13,5 +13,5 @@ public interface IRouteService
         IEnumerable<Node> originEntrances, IEnumerable<Node> destinationEntrances, 
         IEnumerable<Node> parkingAccessNodes);
     
-    List<RouteGuideDto> GetRouteGuides(Route route);
+    List<RouteGuideDto> GetRouteGuides(Route route, string? parkingAreaName = null);
 }

@@ -18,6 +18,13 @@ public class NodeRepository : BaseRepository<Node>, INodeRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<Node>> GetByParkingAreaAsync(int parkingAreaId)
+    {
+        return await context.Nodes
+            .Where(n => n.ParkingAreaId == parkingAreaId)
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<Node>> GetByCampusAsync(int campusId)
     {
         return await context.Nodes

@@ -48,7 +48,22 @@ public class UnitOfWork : IUnitOfWork
                          e.Property(b => b.IsGuestAccessible).IsModified))
             .Select(e => e.Entity.CampusId);
 
-        var affectedCampusIds = edgeCampusIds.Union(buildingCampusIds).ToList();
+        var parkingAreaCampusIds = _context.ChangeTracker
+            .Entries<ParkingArea>()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
+            .Select(e => e.Entity.CampusId);
+
+        var parkingNodeCampusIds = _context.ChangeTracker
+            .Entries<Node>()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Deleted ||
+                        (e.State == EntityState.Modified && e.Property(n => n.ParkingAreaId).IsModified))
+            .Select(e => e.Entity.CampusId);
+
+        var affectedCampusIds = edgeCampusIds
+            .Union(buildingCampusIds)
+            .Union(parkingAreaCampusIds)
+            .Union(parkingNodeCampusIds)
+            .ToList();
 
         var result = await _context.SaveChangesAsync();
 

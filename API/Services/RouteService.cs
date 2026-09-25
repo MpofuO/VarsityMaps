@@ -78,6 +78,9 @@ public class RouteService : IRouteService
             var matchingWalkLeg = walkingLeg.FirstOrDefault(w => w.FromNodeId == vLeg.ToNodeId);
             if (matchingWalkLeg == null) continue;
 
+            var parkingNode = parkingAccessNodes.FirstOrDefault(n => n.NodeId == vLeg.ToNodeId);
+            if (parkingNode is null) continue;
+
             var vCoords = vLeg.Path.Coordinates;
             var wCoords = matchingWalkLeg.Path.Coordinates;
             var combinedCoords = vCoords.Concat(wCoords.Skip(1)).ToArray();
@@ -88,6 +91,9 @@ public class RouteService : IRouteService
                 FromNodeId = vLeg.FromNodeId,
                 ToNodeId = matchingWalkLeg.ToNodeId,
                 Weight = vLeg.Weight + matchingWalkLeg.Weight,
+                TransitionNodeId = parkingNode.NodeId,
+                TransitionParkingAreaId = parkingNode.ParkingAreaId,
+                TransitionLocation = new Point(vCoords[^1]) { SRID = 4326 },
                 RouteGuides = []
             });
 
@@ -97,7 +103,7 @@ public class RouteService : IRouteService
         return multiLegRoutes;
     }
 
-    public List<RouteGuideDto> GetRouteGuides(Route route)
+    public List<RouteGuideDto> GetRouteGuides(Route route, string? parkingAreaName = null)
     {
         var guides = new List<RouteGuideDto>();
         if (route?.Path?.Coordinates is null || route.Path.Coordinates.Length < 2)
@@ -105,11 +111,15 @@ public class RouteService : IRouteService
 
         var coords = route.Path.Coordinates;
         int stepIndex = 0;
+        var transitionIndex = route.TransitionLocation is null
+            ? -1
+            : Array.FindIndex(coords, coordinate => SameCoordinate(coordinate, route.TransitionLocation.Coordinate));
 
         guides.Add(new RouteGuideDto
         {
             StepIndex = stepIndex++,
             Location = new Point(coords[0]) { SRID = 4326 },
+            TravelMode = route.TravelMode,
             Instruction = route.TravelMode switch
             {
                 TravelMode.Car => "Start driving towards your destination parking area",
@@ -122,40 +132,69 @@ public class RouteService : IRouteService
         {
             var prevCoord = coords[i - 1];
             var currentCoord = coords[i];
+            var isTransition = i == transitionIndex;
+            var currentTravelMode = transitionIndex >= 0 && i >= transitionIndex
+                ? TravelMode.Walking
+                : route.TravelMode;
 
-            double incomingBearing = CalculateBearing(prevCoord, currentCoord);
-            double outgoingBearing = CalculateBearing(currentCoord, coords[i + 1]);
-            double angleChange = GetAngularDifference(incomingBearing, outgoingBearing);
-
-            string instruction = ClassifyTurnInstruction(angleChange);
-
-            if (instruction != "Continue straight" && !instruction.Contains("Slight"))
+            if (isTransition)
             {
-                var previousGuide = guides[^1];
-                previousGuide.Instruction = previousGuide.Instruction.StartsWith("Start")
-                    ? $"{previousGuide.Instruction}. {instruction} ahead"
-                    : $"{instruction} ahead";
+                guides.Add(new RouteGuideDto
+                {
+                    StepIndex = stepIndex++,
+                    Location = new Point(currentCoord) { SRID = 4326 },
+                    Instruction = $"Park at {parkingAreaName ?? "the parking area"}. Continue walking to your destination.",
+                    TravelMode = TravelMode.Walking,
+                    IsTransition = true,
+                    ParkingAreaId = route.TransitionParkingAreaId
+                });
             }
 
-            guides.Add(new RouteGuideDto
+            if (!isTransition)
             {
-                StepIndex = stepIndex++,
-                Location = new Point(currentCoord) { SRID = 4326 },
-                Instruction = instruction
-            });
+                double incomingBearing = CalculateBearing(prevCoord, currentCoord);
+                double outgoingBearing = CalculateBearing(currentCoord, coords[i + 1]);
+                double angleChange = GetAngularDifference(incomingBearing, outgoingBearing);
+
+                string instruction = ClassifyTurnInstruction(angleChange);
+
+                if (instruction != "Continue straight" && !instruction.Contains("Slight"))
+                {
+                    var previousGuide = guides[^1];
+                    previousGuide.Instruction = previousGuide.Instruction.StartsWith("Start")
+                        ? $"{previousGuide.Instruction}. {instruction} ahead"
+                        : $"{instruction} ahead";
+                }
+
+                guides.Add(new RouteGuideDto
+                {
+                    StepIndex = stepIndex++,
+                    Location = new Point(currentCoord) { SRID = 4326 },
+                    Instruction = instruction,
+                    TravelMode = currentTravelMode,
+                    ParkingAreaId = currentTravelMode == TravelMode.Walking ? route.TransitionParkingAreaId : null
+                });
+            }
         }
 
         guides.Add(new RouteGuideDto
         {
             StepIndex = stepIndex,
             Location = new Point(coords[^1]) { SRID = 4326 },
-            Instruction = "Proceed to the entrance. You have arrived at your destination"
+            Instruction = "Proceed to the entrance. You have arrived at your destination",
+            TravelMode = route.TransitionLocation is null ? route.TravelMode : TravelMode.Walking,
+            ParkingAreaId = route.TransitionLocation is null ? null : route.TransitionParkingAreaId
         });
 
         return guides;
     }
 
     #region Private Helper Methods
+    private static bool SameCoordinate(Coordinate left, Coordinate right)
+    {
+        return Math.Abs(left.X - right.X) < 1e-7 && Math.Abs(left.Y - right.Y) < 1e-7;
+    }
+
     private static string ClassifyTurnInstruction(double angleChange)
     {
         if (Math.Abs(angleChange) < 20.0)

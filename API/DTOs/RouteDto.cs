@@ -12,4 +12,6 @@ public class RouteDto
     public int FromBuildingId { get; set; }
     public int ToBuildingId { get; set; }
     public TravelMode TravelMode { get; set; }
+    public int? TransitionParkingAreaId { get; set; }
+    public Point? TransitionLocation { get; set; }
 }

@@ -1,0 +1,123 @@
+using API.DTOs;
+using API.Entities;
+using API.Extensions;
+using API.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+
+namespace API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork uow) : ControllerBase
+{
+    [HttpGet]
+    [Authorize(Policy = "RequireCampusAdminOrStandardUserRole")]
+    public async Task<ActionResult<IEnumerable<ParkingAreaDto>>> GetParkingAreas()
+    {
+        var (campusId, isGuest) = await User.GetCampusIdAsync(userManager);
+        var parkingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
+
+        if (isGuest) parkingAreas = parkingAreas.Where(p => p.IsGuestAccessible);
+
+        return Ok(parkingAreas.Select(p => p.ToDto()));
+    }
+
+    [HttpGet("{id:int}")]
+    [Authorize(Policy = "RequireCampusAdminOrStandardUserRole")]
+    public async Task<ActionResult<ParkingAreaDto>> GetParkingArea(int id)
+    {
+        var parkingArea = await uow.ParkingAreaRepository.GetWithAccessNodesAsync(id);
+        if (parkingArea is null) return NotFound();
+
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
+        if (parkingArea.CampusId != campusId) return NotFound();
+
+        return Ok(parkingArea.ToDto());
+    }
+
+    [HttpPost]
+    [Authorize(Policy = "RequireCampusAdminRole")]
+    public async Task<ActionResult<ParkingAreaDto>> AddParkingArea(ParkingAreaDto parkingAreaDto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
+        var existingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
+
+        if (existingAreas.Any(p => p.Name.Equals(parkingAreaDto.Name, StringComparison.OrdinalIgnoreCase)))
+            return BadRequest("A parking area with this name already exists.");
+
+        if (parkingAreaDto.Boundary.IsEmpty || !parkingAreaDto.Boundary.IsValid)
+            return BadRequest("A valid parking area outline is required.");
+
+        var parkingArea = new ParkingArea
+        {
+            Name = parkingAreaDto.Name.Trim(),
+            IsAccessible = parkingAreaDto.IsGuestAccessible || parkingAreaDto.IsAccessible,
+            IsGuestAccessible = parkingAreaDto.IsGuestAccessible,
+            Boundary = parkingAreaDto.Boundary,
+            CampusId = campusId
+        };
+
+        await uow.ParkingAreaRepository.CreateAsync(parkingArea);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to add parking area.");
+
+        return Ok(parkingArea.ToDto());
+    }
+
+    [HttpPut("{parkingAreaId:int}")]
+    [Authorize(Policy = "RequireCampusAdminRole")]
+    public async Task<ActionResult<ParkingAreaDto>> EditParkingArea(int parkingAreaId, ParkingAreaDto parkingAreaDto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var parkingArea = await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId);
+        if (parkingArea is null) return NotFound();
+
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
+        if (parkingArea.CampusId != campusId) return NotFound();
+
+        var existingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
+        if (existingAreas.Any(p => p.ParkingAreaId != parkingAreaId &&
+                                   p.Name.Equals(parkingAreaDto.Name, StringComparison.OrdinalIgnoreCase)))
+            return BadRequest("A parking area with this name already exists.");
+
+        if (parkingAreaDto.Boundary.IsEmpty || !parkingAreaDto.Boundary.IsValid)
+            return BadRequest("A valid parking area outline is required.");
+
+        parkingArea.Name = parkingAreaDto.Name.Trim();
+        parkingArea.IsAccessible = parkingAreaDto.IsGuestAccessible || parkingAreaDto.IsAccessible;
+        parkingArea.IsGuestAccessible = parkingAreaDto.IsGuestAccessible;
+        parkingArea.Boundary = parkingAreaDto.Boundary;
+
+        await uow.ParkingAreaRepository.UpdateAsync(parkingArea);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to update parking area.");
+
+        return Ok(parkingArea.ToDto());
+    }
+
+    [HttpDelete("{parkingAreaId:int}")]
+    [Authorize(Policy = "RequireCampusAdminRole")]
+    public async Task<ActionResult> DeleteParkingArea(int parkingAreaId)
+    {
+        var parkingArea = await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId);
+        if (parkingArea is null) return NotFound();
+
+        var (campusId, _) = await User.GetCampusIdAsync(userManager);
+        if (parkingArea.CampusId != campusId) return NotFound();
+
+        var accessNodes = (await uow.NodeRepository.GetByParkingAreaAsync(parkingAreaId)).ToList();
+        foreach (var node in accessNodes)
+        {
+            node.ParkingAreaId = null;
+            await uow.NodeRepository.UpdateAsync(node);
+        }
+
+        await uow.ParkingAreaRepository.DeleteAsync(parkingArea);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to delete parking area.");
+
+        return Ok();
+    }
+}

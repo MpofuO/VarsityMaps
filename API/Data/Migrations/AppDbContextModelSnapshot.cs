@@ -401,6 +401,15 @@ namespace API.Data.Migrations
                     b.Property<int>("ToNodeId")
                         .HasColumnType("int");
 
+                    b.Property<Point>("TransitionLocation")
+                        .HasColumnType("geometry");
+
+                    b.Property<int?>("TransitionNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TransitionParkingAreaId")
+                        .HasColumnType("int");
+
                     b.Property<int>("TravelMode")
                         .HasColumnType("int");
 
@@ -425,14 +434,23 @@ namespace API.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsTransition")
+                        .HasColumnType("bit");
+
                     b.Property<Point>("Location")
                         .IsRequired()
                         .HasColumnType("geography");
+
+                    b.Property<int?>("ParkingAreaId")
+                        .HasColumnType("int");
 
                     b.Property<int>("RouteId")
                         .HasColumnType("int");
 
                     b.Property<int>("StepIndex")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TravelMode")
                         .HasColumnType("int");
 
                     b.HasKey("RouteGuideId");
