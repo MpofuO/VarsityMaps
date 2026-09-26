@@ -15,7 +15,11 @@ export class ErrorInterceptor implements HttpInterceptor {
     return next.handle(request).pipe(
       catchError((error: HttpErrorResponse) => {
         const message = this.extractMessage(error);
-        this.toastService.error(message);
+        if (error.status === 409) {
+          this.toastService.warning(message);
+        } else {
+          this.toastService.error(message);
+        }
 
         if (error.status >= 500) {
           this.router.navigate(['/server-error']);

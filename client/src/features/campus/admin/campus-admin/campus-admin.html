@@ -238,6 +238,12 @@
         }}</span>?</p>
     <input class="input input-bordered input-sm w-full" placeholder="Entrance name (e.g. Main Entrance)"
       [value]="entranceName()" (input)="entranceName.set($any($event.target).value)" />
+    <label class="form-control w-full">
+      <span class="label-text text-xs mb-1">Interests (separate multiple with semicolons)</span>
+      <input class="input input-bordered input-sm w-full" placeholder="Classes; Lecturer offices"
+        [value]="interestOfEntrance()" (input)="interestOfEntrance.set($any($event.target).value)" />
+      <span class="label-text-alt mt-1">Leave blank if this entrance serves all interests.</span>
+    </label>
     <div class="modal-action">
       <button type="button" class="btn btn-ghost btn-sm" (click)="isEntranceConfirmOpen.set(false)">Cancel</button>
       <button type="button" class="btn btn-primary btn-sm" [disabled]="!entranceName().trim()"

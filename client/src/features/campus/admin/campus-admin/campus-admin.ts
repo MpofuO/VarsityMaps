@@ -135,6 +135,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly isEntranceConfirmOpen = signal(false);
   protected readonly draftEntrancePoint = signal<google.maps.LatLngLiteral | null>(null);
   protected readonly entranceName = signal('');
+  protected readonly interestOfEntrance = signal('');
   protected readonly parkingAccessTarget = signal<ParkingArea | null>(null);
   protected readonly isParkingAccessConfirmOpen = signal(false);
   protected readonly parkingAccessName = signal('');
@@ -654,8 +655,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     });
   }
 
-  handleRenameNode(event: { id: number; name: string | null }): void {
-    this.nodeService.renameNode(event.id, event.name).subscribe({
+  handleRenameNode(event: { id: number; name: string | null; interestOfEntrance: string | null }): void {
+    this.nodeService.updateNodeDetails(event.id, event.name, event.interestOfEntrance).subscribe({
       next: () => {
         this.toastService.success('Node updated.');
         this.load();
@@ -729,6 +730,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   startEntrance(building: Building): void {
     this.entranceTargetBuilding.set(building);
     this.entranceName.set('');
+    this.interestOfEntrance.set('');
     this.mode.set('place-entrance');
   }
 
@@ -744,7 +746,12 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     const name = this.entranceName().trim();
     if (!building || !point || !name) return;
 
-    this.nodeService.addEntranceNode(building.buildingId, name, { type: 'Point', coordinates: [point.lng, point.lat] }).subscribe({
+    this.nodeService.addEntranceNode(
+      building.buildingId,
+      name,
+      this.interestOfEntrance(),
+      { type: 'Point', coordinates: [point.lng, point.lat] }
+    ).subscribe({
       next: () => {
         this.toastService.success('Entrance added.');
         this.isEntranceConfirmOpen.set(false);

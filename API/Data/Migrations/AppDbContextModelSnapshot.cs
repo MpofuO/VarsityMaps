@@ -315,6 +315,9 @@ namespace API.Data.Migrations
                     b.Property<int>("CampusId")
                         .HasColumnType("int");
 
+                    b.Property<string>("InterestOfEntrance")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Point>("Location")
                         .IsRequired()
                         .HasColumnType("geometry");

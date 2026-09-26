@@ -6,10 +6,23 @@ import { RouteGuide } from '../../types/route-guide';
 @Injectable({ providedIn: 'root' })
 export class NavigationService extends BaseService {
 
-  getRoute(fromBuildingId: number, toBuildingId: number, mode: number = 1, originParkingAreaId: number | null = null) {
-    const parkingQuery = originParkingAreaId === null ? '' : `&originParkingAreaId=${originParkingAreaId}`;
+  getRoute(
+    fromBuildingId: number,
+    toBuildingId: number,
+    mode: number = 1,
+    originParkingAreaId: number | null = null,
+    destinationInterest: string | null = null
+  ) {
+    const params = new URLSearchParams({
+      fromBuildingId: String(fromBuildingId),
+      toBuildingId: String(toBuildingId),
+      mode: String(mode)
+    });
+    if (originParkingAreaId !== null) params.set('originParkingAreaId', String(originParkingAreaId));
+    if (destinationInterest !== null) params.set('destinationInterest', destinationInterest);
+
     return this.http.get<RouteResult[] | RouteResult>(
-      `${this.apiUrl}/navigation/route?fromBuildingId=${fromBuildingId}&toBuildingId=${toBuildingId}&mode=${mode}${parkingQuery}`
+      `${this.apiUrl}/navigation/route?${params.toString()}`
     );
   }
 

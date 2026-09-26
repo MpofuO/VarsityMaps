@@ -43,4 +43,7 @@
 </div>
 
 <app-entity-detail-modal [isOpen]="isDetailOpen()" title="Edit node" [name]="detailTarget()?.name ?? null"
-  namePlaceholder="Node name" (save)="saveDetail($event)" (delete)="deleteDetail()" (closed)="closeDetail()" />
+  namePlaceholder="Node name"
+  [showEntranceInterest]="detailTarget()?.buildingId !== null && detailTarget()?.buildingId !== undefined"
+  [interestOfEntrance]="detailTarget()?.interestOfEntrance ?? null" (save)="saveDetail($event)"
+  (delete)="deleteDetail()" (closed)="closeDetail()" />

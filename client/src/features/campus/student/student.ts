@@ -14,6 +14,7 @@ import { TravelMode } from '../../../types/edge';
 import { LocationCoordinates, LocationTrackingService } from '../../../core/services/location-tracking-service';
 import { RouteGuide } from '../../../types/route-guide';
 import { OriginParkingRequired, ParkingAreaOption } from '../../../types/parking-area';
+import { DestinationInterestRequired } from '../../../types/destination-interest-required';
 
 type PickField = 'origin' | 'destination' | null;
 
@@ -51,6 +52,8 @@ export class Student implements OnInit, OnDestroy {
   protected readonly destinationBuildingId = signal<number | null>(null);
   protected readonly originParkingAreaId = signal<number | null>(null);
   protected readonly originParkingOptions = signal<ParkingAreaOption[]>([]);
+  protected readonly destinationInterestOptions = signal<string[]>([]);
+  protected readonly destinationInterest = signal<string | null>(null);
 
   protected readonly routes = signal<RouteResult[]>([]);
   protected readonly selectedRouteIndex = signal<number>(0);
@@ -268,6 +271,9 @@ export class Student implements OnInit, OnDestroy {
         return;
       }
       this.originBuildingId.set(buildingId);
+      this.routes.set([]);
+      this.originParkingAreaId.set(null);
+      this.originParkingOptions.set([]);
       this.recordRecentSearch(buildingId);
       if (this.destinationBuildingId() !== null)
         this.activePickField.set(null);
@@ -278,6 +284,11 @@ export class Student implements OnInit, OnDestroy {
         this.toastService.error('Origin and destination must be different buildings.');
         return;
       }
+      this.destinationInterest.set(null);
+      this.destinationInterestOptions.set([]);
+      this.originParkingAreaId.set(null);
+      this.originParkingOptions.set([]);
+      this.routes.set([]);
       this.destinationBuildingId.set(buildingId);
       this.recordRecentSearch(buildingId);
       this.activePickField.set(null);
@@ -370,6 +381,8 @@ export class Student implements OnInit, OnDestroy {
     this.originBuildingId.set(null);
     this.originParkingAreaId.set(null);
     this.originParkingOptions.set([]);
+    this.destinationInterest.set(null);
+    this.destinationInterestOptions.set([]);
     this.activePickField.set('origin');
   }
 
@@ -380,6 +393,8 @@ export class Student implements OnInit, OnDestroy {
     this.destinationBuildingId.set(null);
     this.originParkingAreaId.set(null);
     this.originParkingOptions.set([]);
+    this.destinationInterest.set(null);
+    this.destinationInterestOptions.set([]);
     this.routes.set([]);
   }
 
@@ -393,23 +408,44 @@ export class Student implements OnInit, OnDestroy {
     if (from === null || to === null) return;
 
     this.isCalculatingRoute.set(true);
-    this.navigationService.getRoute(from, to, this.selectedTravelMode(), this.originParkingAreaId()).subscribe({
+    this.navigationService.getRoute(
+      from,
+      to,
+      this.selectedTravelMode(),
+      this.originParkingAreaId(),
+      this.destinationInterest()
+    ).subscribe({
       next: (routes: any) => {
         this.isCalculatingRoute.set(false);
         const routeList = Array.isArray(routes) ? routes : [routes];
         this.routes.set(routeList);
         this.selectedRouteIndex.set(0);
+        this.destinationInterestOptions.set([]);
       },
       error: (error) => {
         this.isCalculatingRoute.set(false);
-        const fallback = error.error as OriginParkingRequired | undefined;
-        if (error.status === 409 && fallback?.code === 'ORIGIN_PARKING_REQUIRED') {
-          this.originParkingOptions.set(fallback.parkingAreas);
-          return;
+        if (error.status === 409) {
+          const response = error.error as OriginParkingRequired | DestinationInterestRequired | undefined;
+          if (response?.code === 'DESTINATION_INTEREST_REQUIRED') {
+            this.destinationInterestOptions.set(response.interests);
+            this.destinationInterest.set(null);
+            this.originParkingAreaId.set(null);
+            this.originParkingOptions.set([]);
+            return;
+          }
+          if (response?.code === 'ORIGIN_PARKING_REQUIRED') {
+            this.destinationInterestOptions.set([]);
+            this.originParkingOptions.set(response.parkingAreas);
+            return;
+          }
         }
         this.toastService.error('No route could be found between these buildings.');
       }
     });
+  }
+
+  selectDestinationInterest(interest: string): void {
+    this.destinationInterest.set(interest);
   }
 
   selectOriginParkingArea(parkingAreaId: number): void {

@@ -25,7 +25,7 @@ export class CampusNode {
   startPlacingNodes = output<void>();
   startConnecting = output<void>();
   selectNode = output<number>();
-  renameNode = output<{ id: number; name: string | null }>();
+  renameNode = output<{ id: number; name: string | null; interestOfEntrance: string | null }>();
   deleteNode = output<number>();
 
   protected isDetailOpen = signal(false);
@@ -60,10 +60,10 @@ export class CampusNode {
     this.detailTarget.set(null);
   }
 
-  saveDetail(name: string | null): void {
+  saveDetail(details: { name: string | null; interestOfEntrance: string | null }): void {
     const node = this.detailTarget();
     if (!node) return;
-    this.renameNode.emit({ id: node.nodeId, name });
+    this.renameNode.emit({ id: node.nodeId, ...details });
     this.closeDetail();
   }
 

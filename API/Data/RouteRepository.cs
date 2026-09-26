@@ -33,4 +33,12 @@ public class RouteRepository : BaseRepository<Route>, IRouteRepository
             .Include(r => r.RouteGuides.OrderBy(g => g.StepIndex))
             .FirstOrDefaultAsync(r => r.RouteId == routeId);
     }
+
+    public async Task DeleteByBuildingAsync(int buildingId)
+    {
+        var routes = await context.Routes
+            .Where(r => r.FromBuildingId == buildingId || r.ToBuildingId == buildingId)
+            .ToListAsync();
+        context.Routes.RemoveRange(routes);
+    }
 }

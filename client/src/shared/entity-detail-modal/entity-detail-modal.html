@@ -7,6 +7,14 @@
       (input)="value.set($any($event.target).value)"
       (keydown.enter)="onSave()"
     />
+    @if (showEntranceInterest()) {
+      <label class="form-control w-full">
+        <span class="label-text text-xs mb-1">Interests (separate multiple with semicolons)</span>
+        <input class="input input-bordered input-sm w-full" placeholder="Classes; Lecturer offices"
+          [value]="interestValue()" (input)="interestValue.set($any($event.target).value)" />
+        <span class="label-text-alt mt-1">Leave blank if this entrance serves all interests.</span>
+      </label>
+    }
     <div class="modal-action justify-between">
       <button type="button" class="btn btn-error btn-sm" (click)="delete.emit()">Delete</button>
       <div class="flex gap-2">

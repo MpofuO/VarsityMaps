@@ -2,6 +2,7 @@ using API.DTOs;
 using API.Entities;
 using Route = API.Entities.Route;
 using API.Extensions;
+using API.Helpers;
 using API.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -18,7 +19,8 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
     [HttpGet("route")]
     public async Task<ActionResult<IEnumerable<RouteDto>>> GetRoute(
         [FromQuery] int fromBuildingId, [FromQuery] int toBuildingId,
-        [FromQuery] TravelMode mode = TravelMode.Walking, [FromQuery] int? originParkingAreaId = null)
+        [FromQuery] TravelMode mode = TravelMode.Walking, [FromQuery] int? originParkingAreaId = null,
+        [FromQuery] string? destinationInterest = null)
     {
         if (fromBuildingId == toBuildingId)
             return BadRequest("Origin and destination must be different buildings.");
@@ -35,16 +37,60 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         if (fromBuilding.CampusId != campusId || toBuilding.CampusId != campusId)
             return BadRequest("Both buildings must belong to the campus you're currently viewing.");
 
+        var fromEntrances = await uow.NodeRepository.GetByBuildingAsync(fromBuildingId);
+        var allDestinationEntrances = (await uow.NodeRepository.GetByBuildingAsync(toBuildingId)).ToList();
+        if (allDestinationEntrances.Count == 0)
+            return BadRequest("The destination or origin building has no registered entrances.");
+
+        var availableInterests = allDestinationEntrances
+            .SelectMany(entrance => EntranceInterestHelper.Parse(entrance.InterestOfEntrance))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(interest => interest, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var hasConfiguredInterests = availableInterests.Count > 0;
+        List<Node> toEntrances;
+
+        if (hasConfiguredInterests)
+        {
+            if (string.IsNullOrWhiteSpace(destinationInterest))
+            {
+                return Conflict(new DestinationInterestRequiredDto
+                {
+                    Interests = availableInterests
+                });
+            }
+
+            var selectedInterest = destinationInterest.Trim();
+            if (!availableInterests.Contains(selectedInterest, StringComparer.OrdinalIgnoreCase))
+                return BadRequest("The selected destination interest is not available for this building.");
+
+            toEntrances = allDestinationEntrances
+                .Where(entrance =>
+                {
+                    var entranceInterests = EntranceInterestHelper.Parse(entrance.InterestOfEntrance);
+                    return entranceInterests.Count == 0 || entranceInterests.Contains(selectedInterest, StringComparer.OrdinalIgnoreCase);
+                })
+                .ToList();
+        }
+        else
+        {
+            toEntrances = allDestinationEntrances;
+        }
+
         var cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
             fromBuildingId, toBuildingId, mode, null);
 
-        if (cachedRoutes.Count == 0 && originParkingAreaId is not null)
+        if (originParkingAreaId is not null)
         {
-            cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
+            var parkingCachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
                 fromBuildingId, toBuildingId, mode, originParkingAreaId);
+            if (hasConfiguredInterests)
+                cachedRoutes = cachedRoutes.Concat(parkingCachedRoutes).DistinctBy(route => route.RouteId).ToList();
+            else if (cachedRoutes.Count == 0)
+                cachedRoutes = parkingCachedRoutes;
         }
 
-        if (cachedRoutes.Count > 0)
+        if (!hasConfiguredInterests && cachedRoutes.Count > 0)
         {
             foreach (var cachedRoute in cachedRoutes)
             {
@@ -56,9 +102,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
             return Ok(cachedRoutes.Select(route => route.ToDto()));
         }
 
-        var fromEntrances = await uow.NodeRepository.GetByBuildingAsync(fromBuildingId);
-        var toEntrances = await uow.NodeRepository.GetByBuildingAsync(toBuildingId);
-        if (!toEntrances.Any() || (mode != TravelMode.Car && mode != TravelMode.Bus && !fromEntrances.Any()))
+        if (mode != TravelMode.Car && mode != TravelMode.Bus && !fromEntrances.Any())
             return BadRequest("The destination or origin building has no registered entrances.");
 
         List<Route> routes;
@@ -149,12 +193,32 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         if (routes is null || !routes.Any())
             return BadRequest($"No {mode.ToString().ToLower()} route could be found between the specified buildings.");
 
+        var responseRoutes = new List<Route>();
         foreach (var route in routes)
         {
+            if (hasConfiguredInterests)
+            {
+                var matchingCachedRoute = cachedRoutes.FirstOrDefault(cachedRoute =>
+                    cachedRoute.FromNodeId == route.FromNodeId &&
+                    cachedRoute.ToNodeId == route.ToNodeId &&
+                    cachedRoute.OriginParkingAreaId == routeOriginParkingAreaId &&
+                    cachedRoute.TransitionNodeId == route.TransitionNodeId &&
+                    cachedRoute.TransitionParkingAreaId == route.TransitionParkingAreaId);
+
+                if (matchingCachedRoute is not null)
+                {
+                    matchingCachedRoute.SearchCount++;
+                    matchingCachedRoute.LastRetrieved = DateTime.UtcNow;
+                    responseRoutes.Add(matchingCachedRoute);
+                    continue;
+                }
+            }
+
             route.FromBuildingId = fromBuildingId;
             route.ToBuildingId = toBuildingId;
             route.CampusId = campusId;
             route.TravelMode = mode;
+            route.OriginParkingAreaId = routeOriginParkingAreaId;
             if (routeOriginParkingAreaId is not null)
             {
                 route.OriginParkingAreaId = routeOriginParkingAreaId;
@@ -165,11 +229,12 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
             route.LastRetrieved = DateTime.UtcNow;
 
             await uow.RouteRepository.CreateAsync(route);
+            responseRoutes.Add(route);
         }
 
         await uow.CompleteAsync();
 
-        return Ok(routes.Select(r => r.ToDto()));
+        return Ok(responseRoutes.Select(route => route.ToDto()));
     }
 
     [HttpGet("route-guides/{routeId}")]

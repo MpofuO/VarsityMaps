@@ -19,8 +19,8 @@ export class NodeService extends BaseService {
     return this.http.post<Node[]>(`${this.apiUrl}/node`, { nodes: items });
   }
 
-  addEntranceNode(buildingId: number, name: string, location: GeoPoint) {
-    return this.http.post<Node>(`${this.apiUrl}/node/${buildingId}`, { name, location, buildingId: null });
+  addEntranceNode(buildingId: number, name: string, interestOfEntrance: string, location: GeoPoint) {
+    return this.http.post<Node>(`${this.apiUrl}/node/${buildingId}`, { name, interestOfEntrance, location, buildingId: null });
   }
 
   addParkingAccessNode(parkingAreaId: number, name: string, location: GeoPoint) {
@@ -29,6 +29,10 @@ export class NodeService extends BaseService {
 
   renameNode(id: number, name: string | null) {
     return this.http.put<Node>(`${this.apiUrl}/node/${id}/name`, { name: name });
+  }
+
+  updateNodeDetails(id: number, name: string | null, interestOfEntrance: string | null) {
+    return this.http.put<Node>(`${this.apiUrl}/node/${id}/details`, { name, interestOfEntrance });
   }
 
   deleteNode(id: number) {

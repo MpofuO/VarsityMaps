@@ -91,10 +91,10 @@ export class CampusMap implements AfterViewInit {
 
       const options: google.maps.PolygonOptions = {
         paths: item.paths,
-        strokeColor: item.selected ? '#3b82f6' : (item.strokeColor ?? '#7c3aed'),
+        strokeColor: item.selected ? '#FFD700' : (item.strokeColor ?? '#7c3aed'),
         strokeWeight: item.selected ? 3 : 2,
         strokeOpacity: isHiddenForStudent ? 0 : 1,
-        fillColor: item.selected ? '#1d4ed8' : (item.fillColor ?? '#8b5cf6'),
+        fillColor: item.selected ? '#FFFF00' : (item.fillColor ?? '#8b5cf6'),
         fillOpacity: isHiddenForStudent ? 0 : item.selected ? 0.50 : 0.40,
         clickable: item.clickable ?? true,
         zIndex: item.selected ? 10 : 1

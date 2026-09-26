@@ -83,6 +83,7 @@ public static class DtoExtensions
         {
             NodeId = node.NodeId,
             Name = node.Name!,
+            InterestOfEntrance = node.InterestOfEntrance,
             Location = node.Location,
             BuildingId = node.BuildingId,
             ParkingAreaId = node.ParkingAreaId

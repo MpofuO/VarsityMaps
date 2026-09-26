@@ -45,12 +45,14 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var node = new Node
         {
             Name = nodeDto.Name,
+            InterestOfEntrance = EntranceInterestHelper.Normalize(nodeDto.InterestOfEntrance),
             Location = nodeDto.Location,
             CampusId = callerCampusId,
             BuildingId = buildingId
         };
 
         await uow.NodeRepository.CreateAsync(node);
+        await uow.RouteRepository.DeleteByBuildingAsync(buildingId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add entrance node.");
         return Ok(node.ToDto());
     }
@@ -167,6 +169,31 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         return Ok(node.ToDto());
     }
 
+    [HttpPut("{nodeId:int}/details")]
+    public async Task<ActionResult<NodeDto>> UpdateNodeDetails(int nodeId, [FromBody] NodeDetailsDto detailsDto)
+    {
+        var node = await uow.NodeRepository.GetByIdAsync(nodeId);
+        if (node is null) return NotFound();
+
+        var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
+        if (node.CampusId != callerCampusId) return NotFound();
+
+        node.Name = detailsDto.Name;
+        if (node.BuildingId is int buildingId)
+        {
+            var normalizedInterest = EntranceInterestHelper.Normalize(detailsDto.InterestOfEntrance);
+            if (!string.Equals(node.InterestOfEntrance, normalizedInterest, StringComparison.Ordinal))
+            {
+                node.InterestOfEntrance = normalizedInterest;
+                await uow.RouteRepository.DeleteByBuildingAsync(buildingId);
+            }
+        }
+
+        await uow.NodeRepository.UpdateAsync(node);
+        if (!await uow.CompleteAsync()) return BadRequest("Failed to update node.");
+        return Ok(node.ToDto());
+    }
+
     [HttpDelete("{nodeId:int}")]
     public async Task<ActionResult> DeleteNode(int nodeId)
     {
@@ -175,6 +202,9 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         if (node.CampusId != callerCampusId) return NotFound();
+
+        if (node.BuildingId is int buildingId)
+            await uow.RouteRepository.DeleteByBuildingAsync(buildingId);
 
         var edges = await uow.EdgeRepository.GetByNodeAsync(nodeId);
         foreach (var edge in edges)

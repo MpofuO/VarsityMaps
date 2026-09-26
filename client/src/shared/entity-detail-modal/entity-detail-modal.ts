@@ -12,22 +12,29 @@ export class EntityDetailModal {
   title = input('Edit');
   name = input<string | null>(null);
   namePlaceholder = input('Name');
+  showEntranceInterest = input(false);
+  interestOfEntrance = input<string | null>(null);
 
-  save = output<string | null>();
+  save = output<{ name: string | null; interestOfEntrance: string | null }>();
   delete = output<void>();
   closed = output<void>();
 
   protected value = signal('');
+  protected interestValue = signal('');
 
   constructor() {
     effect(() => {
       if (this.isOpen()) {
         this.value.set(this.name() ?? '');
+        this.interestValue.set(this.interestOfEntrance() ?? '');
       }
     });
   }
 
   onSave(): void {
-    this.save.emit(this.value().trim() || null);
+    this.save.emit({
+      name: this.value().trim() || null,
+      interestOfEntrance: this.interestValue().trim() || null
+    });
   }
 }

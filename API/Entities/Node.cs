@@ -6,6 +6,7 @@ public class Node
 {
     public int NodeId { get; set; }
     public string? Name { get; set; }
+    public string? InterestOfEntrance { get; set; }
     public required Point Location { get; set; }
 
     public int CampusId { get; set; }
