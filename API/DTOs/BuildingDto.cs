@@ -10,5 +10,6 @@ public class BuildingDto
     public required string Alias { get; set; }
     public bool IsAccessible { get; set; }
     public bool IsGuestAccessible { get; set; }
+    public bool AllowsPassage { get; set; }
     public required Polygon Boundary { get; set; }
 }

@@ -59,6 +59,7 @@ public static class DtoExtensions
             Alias = building.Alias,
             IsAccessible = building.IsAccessible,
             IsGuestAccessible = building.IsGuestAccessible,
+            AllowsPassage = building.AllowsPassage,
             Boundary = building.Boundary
         };
     }

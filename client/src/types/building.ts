@@ -6,6 +6,7 @@ export interface Building {
   alias: string;
   isAccessible: boolean;
   isGuestAccessible: boolean;
+  allowsPassage: boolean;
   boundary: GeoPolygon;
 }
 
@@ -14,5 +15,6 @@ export interface BuildingModel {
   alias: string;
   isAccessible: boolean;
   isGuestAccessible: boolean;
+  allowsPassage: boolean;
   boundary: GeoPolygon;
 }

@@ -89,6 +89,10 @@
         <input type="checkbox" class="toggle toggle-primary toggle-sm" formControlName="isGuestAccessible" />
         <span class="text-sm">Guest Accessible</span>
       </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" class="toggle toggle-primary toggle-sm" formControlName="allowsPassage" />
+        <span class="text-sm">Allows Passage</span>
+      </label>
     </div>
 
     @if (editingBuilding; as building) {

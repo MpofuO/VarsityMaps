@@ -62,6 +62,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
             Alias = buildingDto.Alias,
             IsAccessible = buildingDto.IsGuestAccessible ? true : buildingDto.IsAccessible,
             IsGuestAccessible = buildingDto.IsGuestAccessible,
+            AllowsPassage = buildingDto.AllowsPassage,
             Boundary = buildingDto.Boundary,
             CampusId = campusId
         };
@@ -94,6 +95,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         building.Alias = buildingDto.Alias;
         building.IsAccessible = buildingDto.IsGuestAccessible ? true : buildingDto.IsAccessible;
         building.IsGuestAccessible = buildingDto.IsGuestAccessible;
+        building.AllowsPassage = buildingDto.AllowsPassage;
 
         await uow.BuildingRepository.UpdateAsync(building);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update building.");

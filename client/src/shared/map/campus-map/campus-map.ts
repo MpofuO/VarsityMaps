@@ -96,7 +96,7 @@ export class CampusMap implements AfterViewInit {
         strokeOpacity: isHiddenForStudent ? 0 : 1,
         fillColor: item.selected ? '#1d4ed8' : (item.fillColor ?? '#8b5cf6'),
         fillOpacity: isHiddenForStudent ? 0 : item.selected ? 0.50 : 0.40,
-        clickable: true,
+        clickable: item.clickable ?? true,
         zIndex: item.selected ? 10 : 1
       };
 

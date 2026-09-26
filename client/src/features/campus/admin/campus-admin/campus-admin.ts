@@ -172,6 +172,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       id: `building-${b.buildingId}`,
       paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
       selected: b.buildingId === this.selectedBuildingId(),
+      clickable: this.mode() !== 'place-nodes' || !b.allowsPassage,
       strokeColor: '#7c3aed',
       fillColor: '#8b5cf6'
     })),
@@ -179,6 +180,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       id: `parking-${p.parkingAreaId}`,
       paths: p.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
       selected: p.parkingAreaId === this.selectedParkingAreaId(),
+      clickable: this.mode() !== 'place-nodes',
       strokeColor: '#0891b2',
       fillColor: '#06b6d4'
     }))
@@ -436,7 +438,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
 
   private isPointInAnyBuilding(point: google.maps.LatLngLiteral): boolean {
-    return this.buildings().some((b) => isPointInPolygon(point, b.boundary.coordinates[0]));
+    return this.buildings().some((b) => !b.allowsPassage && isPointInPolygon(point, b.boundary.coordinates[0]));
   }
 
   onMarkerDblClick(nodeId: number): void {

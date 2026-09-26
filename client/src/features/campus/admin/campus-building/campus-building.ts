@@ -63,7 +63,8 @@ export class CampusBuilding {
     name: ['', [Validators.required, this.nameUniqueValidator()]],
     alias: ['', [Validators.required, this.aliasUniqueValidator()]],
     isAccessible: [true],
-    isGuestAccessible: [false]
+    isGuestAccessible: [false],
+    allowsPassage: [false]
   });
 
   constructor() {
@@ -86,7 +87,7 @@ export class CampusBuilding {
 
   openCreate(): void {
     this.editingBuilding = null;
-    this.form.reset({ name: '', alias: '', isAccessible: true, isGuestAccessible: false });
+    this.form.reset({ name: '', alias: '', isAccessible: true, isGuestAccessible: false, allowsPassage: false });
     this.isFormOpen = true;
   }
 
@@ -96,7 +97,8 @@ export class CampusBuilding {
       name: building.name,
       alias: building.alias,
       isAccessible: building.isAccessible,
-      isGuestAccessible: building.isGuestAccessible
+      isGuestAccessible: building.isGuestAccessible,
+      allowsPassage: building.allowsPassage
     });
     this.isFormOpen = true;
   }
