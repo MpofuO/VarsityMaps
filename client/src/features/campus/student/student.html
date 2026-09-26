@@ -61,14 +61,6 @@
               </div>
             }
 
-            @if (locationService.isMocking()) {
-              <div class="flex gap-2">
-                <button class="btn btn-outline btn-xs flex-1" (click)="simulateMockDeviation()">Simulate Deviation</button>
-                @if (isOffRoute()) {
-                  <button class="btn btn-outline btn-xs flex-1" (click)="returnMockToRoute()">Return Mock to Route</button>
-                }
-              </div>
-            }
           </div>
 
           <button class="btn btn-error btn-sm w-full mt-auto" (click)="promptEndNavigation()">
@@ -206,14 +198,9 @@
                 }
               </div>
 
-              <div class="flex gap-2 pt-2">
-                <button class="btn btn-success btn-sm flex-1" (click)="startNavigation(true)">
-                  Start Nav (Mock)
-                </button>
-                <button class="btn btn-primary btn-sm flex-1" (click)="startNavigation(false)">
-                  Start Nav (Live)
-                </button>
-              </div>
+              <button class="btn btn-primary btn-sm w-full mt-2" (click)="startNavigation()">
+                Start Navigation
+              </button>
             </div>
           }
 

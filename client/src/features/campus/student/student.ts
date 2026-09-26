@@ -482,7 +482,7 @@ export class Student implements OnInit, OnDestroy {
     if (parkingArea) this.centerMapOnBoundsIfNeeded(parkingArea.boundary.coordinates[0], true);
   }
 
-  startNavigation(useMock: boolean = true): void {
+  startNavigation(): void {
     const route = this.activeRoute();
     if (!route) return;
 
@@ -497,7 +497,7 @@ export class Student implements OnInit, OnDestroy {
       this.onRouteSamples = 0;
       this.isNavigating.set(true);
       this.isPlanningRoute.set(false);
-      this.locationService.startTracking(route, useMock);
+      this.locationService.startTracking();
     };
 
     if (route.routeGuides) {
@@ -516,20 +516,11 @@ export class Student implements OnInit, OnDestroy {
     this.currentInstruction.set('Return to the highlighted route to resume guidance.');
   }
 
-  simulateMockDeviation(): void {
-    this.locationService.simulateMockDeviation();
-  }
-
-  returnMockToRoute(): void {
-    this.locationService.returnMockToRoute();
-  }
-
   recalculateRoute(): void {
     const location = this.currentLocation();
     const route = this.activeRoute();
     if (!location || !route || this.isRecalculating()) return;
 
-    const useMock = this.locationService.isMocking();
     this.isRecalculating.set(true);
     this.navigationService.getLiveRoute(
       location.latitude,
@@ -552,7 +543,7 @@ export class Student implements OnInit, OnDestroy {
         this.onRouteSamples = 0;
         this.originLocation.set(location);
         this.updateUserMarker(location);
-        this.locationService.startTracking(result.route, useMock);
+        this.locationService.startTracking();
         this.isRecalculating.set(false);
       },
       error: (error) => {
