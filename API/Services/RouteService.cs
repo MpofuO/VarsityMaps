@@ -60,6 +60,46 @@ public class RouteService : IRouteService
         return routes;
     }
 
+    public List<Route> GetShortestPathFromLocation(IReadOnlyList<Edge> navigableEdges, Point origin,
+        IEnumerable<Node> destinationEntrances)
+    {
+        const int originNodeId = int.MinValue;
+        const int snapNodeId = int.MinValue + 1;
+        const double maxSnapDistanceMeters = 75;
+
+        var nearestEdge = navigableEdges
+            .Select(edge => (Edge: edge, Projection: ProjectOntoEdge(origin, edge)))
+            .Where(candidate => candidate.Projection.DistanceMeters <= maxSnapDistanceMeters)
+            .OrderBy(candidate => candidate.Projection.DistanceMeters)
+            .FirstOrDefault();
+
+        if (nearestEdge.Edge is null)
+            return [];
+
+        var originNode = new Node
+        {
+            NodeId = originNodeId,
+            CampusId = nearestEdge.Edge.CampusId,
+            Location = origin
+        };
+        var snapNode = new Node
+        {
+            NodeId = snapNodeId,
+            CampusId = nearestEdge.Edge.CampusId,
+            Location = nearestEdge.Projection.Location
+        };
+
+        var edges = navigableEdges.ToList();
+        edges.Add(CreateTemporaryEdge(originNode, snapNode, (decimal)nearestEdge.Projection.DistanceMeters,
+            nearestEdge.Edge));
+        edges.Add(CreateTemporaryEdge(snapNode, nearestEdge.Edge.FromNode,
+            nearestEdge.Edge.Weight * (decimal)nearestEdge.Projection.Fraction, nearestEdge.Edge));
+        edges.Add(CreateTemporaryEdge(snapNode, nearestEdge.Edge.ToNode,
+            nearestEdge.Edge.Weight * (decimal)(1 - nearestEdge.Projection.Fraction), nearestEdge.Edge));
+
+        return GetShortestPath(edges, [originNode], destinationEntrances);
+    }
+
     public List<Route> GetMultiLegPath(IReadOnlyList<Edge> drivingEdges, IReadOnlyList<Edge> walkingEdges,
         IEnumerable<Node> originEntrances, IEnumerable<Node> destinationEntrances, IEnumerable<Node> parkingAccessNodes)
     {
@@ -292,6 +332,51 @@ public class RouteService : IRouteService
     private static bool SameCoordinate(Coordinate left, Coordinate right)
     {
         return Math.Abs(left.X - right.X) < 1e-7 && Math.Abs(left.Y - right.Y) < 1e-7;
+    }
+
+    private static (Point Location, double Fraction, double DistanceMeters) ProjectOntoEdge(Point origin, Edge edge)
+    {
+        var start = edge.FromNode.Location;
+        var end = edge.ToNode.Location;
+        var latitudeScale = Math.Cos(origin.Y * Math.PI / 180.0);
+        var longitudeScale = 111_320 * latitudeScale;
+        const double latitudeMetersPerDegree = 110_574;
+
+        var startX = (start.X - origin.X) * longitudeScale;
+        var startY = (start.Y - origin.Y) * latitudeMetersPerDegree;
+        var endX = (end.X - origin.X) * longitudeScale;
+        var endY = (end.Y - origin.Y) * latitudeMetersPerDegree;
+        var deltaX = endX - startX;
+        var deltaY = endY - startY;
+        var lengthSquared = deltaX * deltaX + deltaY * deltaY;
+        var fraction = lengthSquared == 0
+            ? 0
+            : Math.Clamp(-(startX * deltaX + startY * deltaY) / lengthSquared, 0, 1);
+        var projectedX = startX + fraction * deltaX;
+        var projectedY = startY + fraction * deltaY;
+        var projectedLocation = new Point(
+            start.X + (end.X - start.X) * fraction,
+            start.Y + (end.Y - start.Y) * fraction)
+        {
+            SRID = 4326
+        };
+
+        return (projectedLocation, fraction, Math.Sqrt(projectedX * projectedX + projectedY * projectedY));
+    }
+
+    private static Edge CreateTemporaryEdge(Node from, Node to, decimal weight, Edge template)
+    {
+        return new Edge
+        {
+            EdgeId = int.MinValue,
+            CampusId = template.CampusId,
+            FromNode = from,
+            FromNodeId = from.NodeId,
+            ToNode = to,
+            ToNodeId = to.NodeId,
+            Weight = weight,
+            TravelModes = template.TravelModes
+        };
     }
 
     private static string ClassifyTurnInstruction(double angleChange)

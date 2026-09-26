@@ -237,6 +237,156 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         return Ok(responseRoutes.Select(route => route.ToDto()));
     }
 
+    [HttpPost("live-route")]
+    public async Task<ActionResult<LiveRouteDto>> GetLiveRoute([FromBody] LiveRouteRequestDto request)
+    {
+        var origin = request.Location;
+        if (origin is null || origin.IsEmpty || !double.IsFinite(origin.Y) || origin.Y is < -90 or > 90 ||
+            !double.IsFinite(origin.X) || origin.X is < -180 or > 180)
+            return BadRequest("A valid origin location is required.");
+        origin.SRID = 4326;
+
+        var (campusId, isGuest) = await User.GetNavigationContextAsync(userManager, uow);
+        if (campusId == 0)
+            return BadRequest("No active campus set for this user.");
+
+        var destination = await uow.BuildingRepository.GetByIdAsync(request.ToBuildingId);
+        if (destination is null || destination.CampusId != campusId)
+            return BadRequest("The destination must belong to the campus you're currently viewing.");
+
+        var allDestinationEntrances = (await uow.NodeRepository.GetByBuildingAsync(request.ToBuildingId)).ToList();
+        if (allDestinationEntrances.Count == 0)
+            return BadRequest("The destination building has no registered entrances.");
+
+        var availableInterests = allDestinationEntrances
+            .SelectMany(entrance => EntranceInterestHelper.Parse(entrance.InterestOfEntrance))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(interest => interest, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var hasConfiguredInterests = availableInterests.Count > 0;
+        List<Node> destinationEntrances;
+
+        if (hasConfiguredInterests)
+        {
+            if (string.IsNullOrWhiteSpace(request.DestinationInterest))
+                return Conflict(new DestinationInterestRequiredDto { Interests = availableInterests });
+
+            var selectedInterest = request.DestinationInterest.Trim();
+            if (!availableInterests.Contains(selectedInterest, StringComparer.OrdinalIgnoreCase))
+                return BadRequest("The selected destination interest is not available for this building.");
+
+            destinationEntrances = allDestinationEntrances
+                .Where(entrance =>
+                {
+                    var interests = EntranceInterestHelper.Parse(entrance.InterestOfEntrance);
+                    return interests.Count == 0 || interests.Contains(selectedInterest, StringComparer.OrdinalIgnoreCase);
+                })
+                .ToList();
+        }
+        else
+        {
+            destinationEntrances = allDestinationEntrances;
+        }
+
+        var originBuilding = (await uow.BuildingRepository.GetByCampusAsync(campusId))
+            .FirstOrDefault(building => building.Boundary.Covers(origin));
+        List<Route> routes;
+
+        if (originBuilding is not null)
+        {
+            var originEntrances = (await uow.NodeRepository.GetByBuildingAsync(originBuilding.BuildingId)).ToList();
+            if (originEntrances.Count == 0)
+                return BadRequest("Your current building has no registered entrances.");
+
+            var edges = isGuest
+                ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, request.Mode)
+                : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, request.Mode);
+            var navigableEdges = edges
+                .Where(edge => !(edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow)))
+                .ToList();
+            routes = routeService.GetShortestPath(navigableEdges, originEntrances, destinationEntrances);
+        }
+        else
+        {
+            var edges = isGuest
+                ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, request.Mode)
+                : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, request.Mode);
+            var navigableEdges = edges
+                .Where(edge => !(edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow)))
+                .ToList();
+            routes = routeService.GetShortestPathFromLocation(navigableEdges, origin, destinationEntrances);
+
+            if (!routes.Any() && request.Mode is TravelMode.Car or TravelMode.Bus)
+            {
+                var parkingAreas = (await uow.ParkingAreaRepository.GetByCampusAsync(campusId))
+                    .Where(parking => parking.IsAccessible && (!isGuest || parking.IsGuestAccessible) && parking.AccessNodes.Any())
+                    .ToList();
+                var destinationParkingArea = parkingAreas
+                    .OrderBy(parking => parking.Boundary.Distance(destination.Boundary))
+                    .FirstOrDefault();
+
+                if (destinationParkingArea is not null)
+                {
+                    var walkingEdges = isGuest
+                        ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, TravelMode.Walking)
+                        : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, TravelMode.Walking);
+                    var navigableWalkingEdges = walkingEdges
+                        .Where(edge => !(edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow)))
+                        .ToList();
+                    var vehicleLegs = routeService.GetShortestPathFromLocation(
+                        navigableEdges, origin, destinationParkingArea.AccessNodes);
+                    routes = [];
+
+                    foreach (var vehicleLeg in vehicleLegs)
+                    {
+                        var parkingNode = destinationParkingArea.AccessNodes
+                            .FirstOrDefault(node => node.NodeId == vehicleLeg.ToNodeId);
+                        if (parkingNode is null) continue;
+
+                        var walkingLeg = routeService.GetShortestPath(
+                            navigableWalkingEdges, [parkingNode], destinationEntrances)
+                            .OrderBy(candidate => candidate.Weight)
+                            .FirstOrDefault();
+                        if (walkingLeg is null) continue;
+
+                        var vehicleCoordinates = vehicleLeg.Path.Coordinates;
+                        var walkingCoordinates = walkingLeg.Path.Coordinates;
+                        routes.Add(new Route
+                        {
+                            Path = new LineString(vehicleCoordinates.Concat(walkingCoordinates.Skip(1)).ToArray()),
+                            FromNodeId = vehicleLeg.FromNodeId,
+                            ToNodeId = walkingLeg.ToNodeId,
+                            Weight = vehicleLeg.Weight + walkingLeg.Weight,
+                            TransitionNodeId = parkingNode.NodeId,
+                            TransitionParkingAreaId = parkingNode.ParkingAreaId,
+                            TransitionLocation = new Point(walkingCoordinates[0]) { SRID = 4326 },
+                            RouteGuides = []
+                        });
+                    }
+                }
+            }
+        }
+
+        var route = routes.OrderBy(candidate => candidate.Weight).FirstOrDefault();
+        if (route is null)
+            return NotFound("No navigable route could be found from your location to the destination.");
+
+        route.FromBuildingId = originBuilding?.BuildingId ?? 0;
+        route.ToBuildingId = request.ToBuildingId;
+        route.CampusId = campusId;
+        route.TravelMode = request.Mode;
+        route.RouteGuides = [];
+
+        return Ok(new LiveRouteDto
+        {
+            Route = route.ToDto(),
+            RouteGuides = routeService.GetRouteGuides(route),
+            OriginSnapLocation = originBuilding is null && route.Path.Coordinates.Length > 1
+                ? new Point(route.Path.Coordinates[1]) { SRID = 4326 }
+                : null
+        });
+    }
+
     [HttpGet("route-guides/{routeId}")]
     public async Task<ActionResult<IEnumerable<RouteGuideDto>>> GetRouteGuides(int routeId)
     {

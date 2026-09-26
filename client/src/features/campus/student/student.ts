@@ -44,8 +44,12 @@ export class Student implements OnInit, OnDestroy {
   protected readonly showEndConfirmModal = signal(false);
 
   protected readonly currentLocation = signal<LocationCoordinates | null>(null);
+  protected readonly originLocation = signal<LocationCoordinates | null>(null);
   protected readonly currentInstruction = signal<string>('Follow the highlighted path');
   protected readonly remainingRouteDistance = signal<number>(0);
+  protected readonly isOffRoute = signal(false);
+  protected readonly showDeviationPrompt = signal(false);
+  protected readonly isRecalculating = signal(false);
 
   protected readonly activePickField = signal<PickField>(null);
   protected readonly originBuildingId = signal<number | null>(null);
@@ -73,6 +77,8 @@ export class Student implements OnInit, OnDestroy {
   private userMarker?: google.maps.Marker;
   private locationSub?: Subscription;
   private errorSub?: Subscription;
+  private deviationSamples = 0;
+  private onRouteSamples = 0;
   private readonly element = inject(ElementRef);
 
   protected readonly activeRoute = computed(() => {
@@ -146,6 +152,7 @@ export class Student implements OnInit, OnDestroy {
     if (!route) return [];
 
     const markers: MapMarker[] = [];
+
     if (route.originParkingLocation) {
       markers.push({
         id: route.routeId * -1 || -1,
@@ -194,6 +201,7 @@ export class Student implements OnInit, OnDestroy {
 
   effect(() => {
     this.originBuildingId();
+    this.originLocation();
     this.destinationBuildingId();
     this.selectedTravelMode();
 
@@ -255,6 +263,8 @@ export class Student implements OnInit, OnDestroy {
 
   onMapReady(map: google.maps.Map): void {
     this.map = map;
+    const location = this.currentLocation() ?? this.originLocation();
+    if (location) this.updateUserMarker(location);
   }
 
   selectBuilding(key: string): void {
@@ -271,6 +281,7 @@ export class Student implements OnInit, OnDestroy {
         return;
       }
       this.originBuildingId.set(buildingId);
+      this.originLocation.set(null);
       this.routes.set([]);
       this.originParkingAreaId.set(null);
       this.originParkingOptions.set([]);
@@ -319,23 +330,13 @@ export class Student implements OnInit, OnDestroy {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        let nearest: Building | null = null;
-        let minDistance = Infinity;
-
-        for (const b of this.buildings()) {
-          const [bLng, bLat] = b.boundary.coordinates[0][0];
-          const dist = Math.hypot(bLat - latitude, bLng - longitude);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearest = b;
-          }
-        }
-
-        if (nearest) {
-          this.originBuildingId.set(nearest.buildingId);
-          this.activePickField.set('destination');
-          this.toastService.success(`Nearest origin set to ${nearest.name}`);
-        }
+        this.originBuildingId.set(null);
+        const location = { latitude, longitude, accuracy: pos.coords.accuracy };
+        this.originLocation.set(location);
+        this.updateUserMarker(location);
+        this.map?.panTo({ lat: latitude, lng: longitude });
+        this.activePickField.set('destination');
+        this.toastService.success('Current location set as origin.');
       },
       () => {
         this.toastService.error('Access to location was denied or is unavailable.');
@@ -379,6 +380,7 @@ export class Student implements OnInit, OnDestroy {
     }
 
     this.originBuildingId.set(null);
+    this.originLocation.set(null);
     this.originParkingAreaId.set(null);
     this.originParkingOptions.set([]);
     this.destinationInterest.set(null);
@@ -390,6 +392,7 @@ export class Student implements OnInit, OnDestroy {
     this.isPlanningRoute.set(false);
     this.activePickField.set(null);
     this.originBuildingId.set(null);
+    this.originLocation.set(null);
     this.destinationBuildingId.set(null);
     this.originParkingAreaId.set(null);
     this.originParkingOptions.set([]);
@@ -404,12 +407,33 @@ export class Student implements OnInit, OnDestroy {
 
   calculateRoute(): void {
     const from = this.originBuildingId();
+    const liveOrigin = this.originLocation();
     const to = this.destinationBuildingId();
-    if (from === null || to === null) return;
+    if ((from === null && liveOrigin === null) || to === null) return;
 
     this.isCalculatingRoute.set(true);
+    if (liveOrigin) {
+      this.navigationService.getLiveRoute(
+        liveOrigin.latitude,
+        liveOrigin.longitude,
+        to,
+        this.selectedTravelMode(),
+        this.destinationInterest()
+      ).subscribe({
+        next: (result) => {
+          this.isCalculatingRoute.set(false);
+          result.route.routeGuides = result.routeGuides;
+          this.routes.set([result.route]);
+          this.selectedRouteIndex.set(0);
+          this.destinationInterestOptions.set([]);
+        },
+        error: (error) => this.handleRouteError(error)
+      });
+      return;
+    }
+
     this.navigationService.getRoute(
-      from,
+      from!,
       to,
       this.selectedTravelMode(),
       this.originParkingAreaId(),
@@ -423,25 +447,29 @@ export class Student implements OnInit, OnDestroy {
         this.destinationInterestOptions.set([]);
       },
       error: (error) => {
-        this.isCalculatingRoute.set(false);
-        if (error.status === 409) {
-          const response = error.error as OriginParkingRequired | DestinationInterestRequired | undefined;
-          if (response?.code === 'DESTINATION_INTEREST_REQUIRED') {
-            this.destinationInterestOptions.set(response.interests);
-            this.destinationInterest.set(null);
-            this.originParkingAreaId.set(null);
-            this.originParkingOptions.set([]);
-            return;
-          }
-          if (response?.code === 'ORIGIN_PARKING_REQUIRED') {
-            this.destinationInterestOptions.set([]);
-            this.originParkingOptions.set(response.parkingAreas);
-            return;
-          }
-        }
-        this.toastService.error('No route could be found between these buildings.');
+        this.handleRouteError(error);
       }
     });
+  }
+
+  private handleRouteError(error: any): void {
+    this.isCalculatingRoute.set(false);
+    if (error.status === 409) {
+      const response = error.error as OriginParkingRequired | DestinationInterestRequired | undefined;
+      if (response?.code === 'DESTINATION_INTEREST_REQUIRED') {
+        this.destinationInterestOptions.set(response.interests);
+        this.destinationInterest.set(null);
+        this.originParkingAreaId.set(null);
+        this.originParkingOptions.set([]);
+        return;
+      }
+      if (response?.code === 'ORIGIN_PARKING_REQUIRED') {
+        this.destinationInterestOptions.set([]);
+        this.originParkingOptions.set(response.parkingAreas);
+        return;
+      }
+    }
+    this.toastService.error('No route could be found from this origin to the destination.');
   }
 
   selectDestinationInterest(interest: string): void {
@@ -458,23 +486,80 @@ export class Student implements OnInit, OnDestroy {
     const route = this.activeRoute();
     if (!route) return;
 
+    const beginNavigation = (guides: RouteGuide[]) => {
+      this.routeGuides.set(guides);
+      this.activeGuideIndex.set(0);
+      this.currentInstruction.set(guides[0]?.instruction ?? 'Follow the highlighted path');
+      this.remainingRouteDistance.set(Math.round(this.routeDistance(route.path.coordinates)));
+      this.isOffRoute.set(false);
+      this.showDeviationPrompt.set(false);
+      this.deviationSamples = 0;
+      this.onRouteSamples = 0;
+      this.isNavigating.set(true);
+      this.isPlanningRoute.set(false);
+      this.locationService.startTracking(route, useMock);
+    };
+
+    if (route.routeGuides) {
+      beginNavigation(route.routeGuides);
+      return;
+    }
+
     this.navigationService.getRouteGuides(route.routeId).subscribe({
-      next: (guides) => {
-        this.routeGuides.set(guides);
+      next: beginNavigation,
+      error: () => this.toastService.error('Failed to load navigation instructions.')
+    });
+  }
+
+  dismissDeviationPrompt(): void {
+    this.showDeviationPrompt.set(false);
+    this.currentInstruction.set('Return to the highlighted route to resume guidance.');
+  }
+
+  simulateMockDeviation(): void {
+    this.locationService.simulateMockDeviation();
+  }
+
+  returnMockToRoute(): void {
+    this.locationService.returnMockToRoute();
+  }
+
+  recalculateRoute(): void {
+    const location = this.currentLocation();
+    const route = this.activeRoute();
+    if (!location || !route || this.isRecalculating()) return;
+
+    const useMock = this.locationService.isMocking();
+    this.isRecalculating.set(true);
+    this.navigationService.getLiveRoute(
+      location.latitude,
+      location.longitude,
+      route.toBuildingId,
+      route.travelMode,
+      this.destinationInterest()
+    ).subscribe({
+      next: (result) => {
+        result.route.routeGuides = result.routeGuides;
+        this.routes.set([result.route]);
+        this.selectedRouteIndex.set(0);
+        this.routeGuides.set(result.routeGuides);
         this.activeGuideIndex.set(0);
-
-        if (guides.length > 0) {
-          this.currentInstruction.set(guides[0].instruction);
-        }
-
-        this.remainingRouteDistance.set(Math.round(this.routeDistance(route.path.coordinates)));
-
-        this.isNavigating.set(true);
-        this.isPlanningRoute.set(false);
-        this.locationService.startTracking(route, useMock);
+        this.currentInstruction.set(result.routeGuides[0]?.instruction ?? 'Follow the highlighted path');
+        this.remainingRouteDistance.set(Math.round(this.routeDistance(result.route.path.coordinates)));
+        this.isOffRoute.set(false);
+        this.showDeviationPrompt.set(false);
+        this.deviationSamples = 0;
+        this.onRouteSamples = 0;
+        this.originLocation.set(location);
+        this.updateUserMarker(location);
+        this.locationService.startTracking(result.route, useMock);
+        this.isRecalculating.set(false);
       },
-      error: () => {
-        this.toastService.error('Failed to load navigation instructions.');
+      error: (error) => {
+        this.isRecalculating.set(false);
+        this.toastService.error(error.status === 404
+          ? 'No route could be found from your current location.'
+          : 'Failed to recalculate the route.');
       }
     });
   }
@@ -498,7 +583,12 @@ export class Student implements OnInit, OnDestroy {
     this.routes.set([]);
     this.selectedRouteIndex.set(0);
     this.originBuildingId.set(null);
+    this.originLocation.set(null);
     this.destinationBuildingId.set(null);
+    this.isOffRoute.set(false);
+    this.showDeviationPrompt.set(false);
+    this.deviationSamples = 0;
+    this.onRouteSamples = 0;
 
     if (this.userMarker) {
       this.userMarker.setMap(null);
@@ -512,18 +602,19 @@ export class Student implements OnInit, OnDestroy {
     const position = { lat: loc.latitude, lng: loc.longitude };
 
     if (!this.userMarker) {
+      const pinSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64">' +
+        '<path d="M24 2C11.8 2 2 11.8 2 24c0 16 22 38 22 38s22-22 22-38C46 11.8 36.2 2 24 2Z" fill="#2563eb" stroke="#fff" stroke-width="2"/>' +
+        '<circle cx="24" cy="24" r="10" fill="#fff"/></svg>';
       this.userMarker = new google.maps.Marker({
         position,
         map: this.map,
         title: 'Your Location',
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: '#3b82f6',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
-        }
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(pinSvg)}`,
+          scaledSize: new google.maps.Size(30, 40),
+          anchor: new google.maps.Point(15, 40)
+        },
+        zIndex: 1000
       });
     } else {
       this.userMarker.setPosition(position);
@@ -541,6 +632,30 @@ export class Student implements OnInit, OnDestroy {
 
     const destCoord = active.path.coordinates[active.path.coordinates.length - 1];
     const distanceToDest = this.haversine(loc.latitude, loc.longitude, destCoord[1], destCoord[0]);
+
+    const distanceToRoute = this.distanceFromRoute(loc, active.path.coordinates);
+    const deviationThreshold = Math.max(15, Math.min(35, (loc.accuracy ?? 0) * 1.5));
+    if (this.isOffRoute()) {
+      this.remainingRouteDistance.set(Math.round(this.routeDistanceFromLocation(loc, active.path.coordinates)));
+      this.onRouteSamples = distanceToRoute < deviationThreshold * 0.6 ? this.onRouteSamples + 1 : 0;
+      if (this.onRouteSamples >= 2) {
+        this.isOffRoute.set(false);
+        this.showDeviationPrompt.set(false);
+        this.deviationSamples = 0;
+        this.onRouteSamples = 0;
+      } else {
+        return;
+      }
+    } else {
+      this.deviationSamples = distanceToRoute > deviationThreshold ? this.deviationSamples + 1 : 0;
+      if (this.deviationSamples >= 3) {
+        this.isOffRoute.set(true);
+        this.showDeviationPrompt.set(true);
+        this.currentInstruction.set('You are off route. Return to the highlighted path or recalculate.');
+        this.remainingRouteDistance.set(Math.round(this.routeDistanceFromLocation(loc, active.path.coordinates)));
+        return;
+      }
+    }
 
     if (distanceToDest < 3) {
       this.endNavigationSession();
@@ -569,6 +684,25 @@ export class Student implements OnInit, OnDestroy {
       this.currentInstruction.set(`Navigating towards ${this.destinationBuilding()?.name || 'Destination'}`);
       this.remainingRouteDistance.set(Math.round(distanceToDest));
     }
+  }
+
+  private distanceFromRoute(loc: LocationCoordinates, coordinates: [number, number][]): number {
+    if (coordinates.length === 0) return Infinity;
+    if (coordinates.length === 1) {
+      return this.haversine(loc.latitude, loc.longitude, coordinates[0][1], coordinates[0][0]);
+    }
+
+    let nearestDistance = Infinity;
+    for (let index = 0; index < coordinates.length - 1; index++) {
+      const projection = this.projectOntoSegment(loc, coordinates[index], coordinates[index + 1]);
+      nearestDistance = Math.min(nearestDistance, this.haversine(
+        loc.latitude,
+        loc.longitude,
+        projection[1],
+        projection[0]
+      ));
+    }
+    return nearestDistance;
   }
 
   private routeDistance(coordinates: [number, number][]): number {

@@ -41,6 +41,34 @@
                 Distance Remaining: <span class="font-bold">{{ remainingRouteDistance() }} m</span>
               </div>
             </div>
+
+            @if (isOffRoute()) {
+              <div class="p-3 bg-warning/10 border border-warning/40 rounded-box space-y-2">
+                <div class="font-semibold text-sm">You are off route</div>
+                @if (showDeviationPrompt()) {
+                  <p class="text-xs">Return to the highlighted path, or recalculate from your current location.</p>
+                  <div class="flex gap-2">
+                    <button class="btn btn-warning btn-sm flex-1" [disabled]="isRecalculating()" (click)="recalculateRoute()">
+                      @if (isRecalculating()) { <span class="loading loading-spinner loading-xs"></span> }
+                      Recalculate
+                    </button>
+                    <button class="btn btn-ghost btn-sm flex-1" (click)="dismissDeviationPrompt()">I'll get back</button>
+                  </div>
+                } @else {
+                  <p class="text-xs">Waiting for you to return to the highlighted path.</p>
+                  <button class="btn btn-warning btn-sm w-full" [disabled]="isRecalculating()" (click)="recalculateRoute()">Recalculate</button>
+                }
+              </div>
+            }
+
+            @if (locationService.isMocking()) {
+              <div class="flex gap-2">
+                <button class="btn btn-outline btn-xs flex-1" (click)="simulateMockDeviation()">Simulate Deviation</button>
+                @if (isOffRoute()) {
+                  <button class="btn btn-outline btn-xs flex-1" (click)="returnMockToRoute()">Return Mock to Route</button>
+                }
+              </div>
+            }
           </div>
 
           <button class="btn btn-error btn-sm w-full mt-auto" (click)="promptEndNavigation()">
@@ -59,7 +87,7 @@
             (click)="pickField('origin')"
           >
             <span class="text-xs opacity-70 mr-1">From:</span>
-            {{ originBuilding()?.name || 'Tap to choose' }}
+            {{ originLocation() ? 'Your location' : originBuilding()?.name || 'Tap to choose' }}
           </button>
 
           <button
@@ -140,7 +168,7 @@
             </div>
           }
 
-          @if (originBuildingId() && destinationBuildingId() && routes().length === 0 && destinationInterestOptions().length === 0) {
+          @if ((originBuildingId() || originLocation()) && destinationBuildingId() && routes().length === 0 && destinationInterestOptions().length === 0) {
             <button class="btn btn-success btn-sm w-full text-success-content"
               [disabled]="isCalculatingRoute() || (originParkingOptions().length > 0 && originParkingAreaId() === null)"
               (click)="calculateRoute()">

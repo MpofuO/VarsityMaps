@@ -6,6 +6,7 @@ export interface LocationCoordinates {
   latitude: number;
   longitude: number;
   heading?: number | null;
+  accuracy?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -17,6 +18,9 @@ export class LocationTrackingService {
   
   private watchId: number | null = null;
   private mockIntervalId: any = null;
+  private mockCoordinates: [number, number][] = [];
+  private mockIndex = 0;
+  private mockDeviation = false;
 
   public location$ = this.locationSubject.asObservable();
   public error$ = this.errorSubject.asObservable();
@@ -42,6 +46,24 @@ export class LocationTrackingService {
       clearInterval(this.mockIntervalId);
       this.mockIntervalId = null;
     }
+
+    this.mockCoordinates = [];
+    this.mockDeviation = false;
+  }
+
+  simulateMockDeviation(): void {
+    if (!this.isMocking() || this.mockCoordinates.length < 2) return;
+
+    this.mockIndex = Math.floor(this.mockCoordinates.length / 2);
+    this.mockDeviation = true;
+    this.emitMockLocation();
+  }
+
+  returnMockToRoute(): void {
+    if (!this.isMocking() || this.mockCoordinates.length === 0) return;
+
+    this.mockDeviation = false;
+    this.emitMockLocation();
   }
 
   private startLiveTracking(): void {
@@ -55,7 +77,8 @@ export class LocationTrackingService {
         this.locationSubject.next({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-          heading: pos.coords.heading
+          heading: pos.coords.heading,
+          accuracy: pos.coords.accuracy
         });
       },
       (err) => {
@@ -73,15 +96,37 @@ export class LocationTrackingService {
     const coords = route.path.coordinates;
     if (!coords || coords.length === 0) return;
 
-    let index = 0;
+    this.mockCoordinates = coords;
+    this.mockIndex = 0;
     this.mockIntervalId = setInterval(() => {
-      const [lng, lat] = coords[index];
-      this.locationSubject.next({ latitude: lat, longitude: lng });
-
-      index++;
-      if (index >= coords.length) {
-        index = coords.length - 1;
-      }
+      this.emitMockLocation();
+      this.mockIndex = Math.min(this.mockIndex + 1, this.mockCoordinates.length - 1);
     }, 2000);
+  }
+
+  private emitMockLocation(): void {
+    const coordinates = this.mockCoordinates;
+    if (coordinates.length === 0) return;
+
+    const [longitude, latitude] = coordinates[this.mockIndex];
+    if (!this.mockDeviation || coordinates.length < 2) {
+      this.locationSubject.next({ latitude, longitude, accuracy: 5 });
+      return;
+    }
+
+    const start = coordinates[Math.max(0, this.mockIndex - 1)];
+    const end = coordinates[Math.min(this.mockIndex + 1, coordinates.length - 1)];
+    const latitudeScale = 110_574;
+    const longitudeScale = 111_320 * Math.cos(latitude * Math.PI / 180);
+    const deltaX = (end[0] - start[0]) * longitudeScale;
+    const deltaY = (end[1] - start[1]) * latitudeScale;
+    const length = Math.hypot(deltaX, deltaY) || 1;
+    const offsetMeters = 35;
+
+    this.locationSubject.next({
+      latitude: latitude + deltaX / length * offsetMeters / latitudeScale,
+      longitude: longitude - deltaY / length * offsetMeters / longitudeScale,
+      accuracy: 5
+    });
   }
 }

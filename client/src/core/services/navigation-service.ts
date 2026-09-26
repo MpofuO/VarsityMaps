@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BaseService } from './base-service';
-import { RouteResult } from '../../types/route-result';
+import { LiveRouteResult, RouteResult } from '../../types/route-result';
 import { RouteGuide } from '../../types/route-guide';
 
 @Injectable({ providedIn: 'root' })
@@ -24,6 +24,24 @@ export class NavigationService extends BaseService {
     return this.http.get<RouteResult[] | RouteResult>(
       `${this.apiUrl}/navigation/route?${params.toString()}`
     );
+  }
+
+  getLiveRoute(
+    latitude: number,
+    longitude: number,
+    toBuildingId: number,
+    mode: number,
+    destinationInterest: string | null = null
+  ) {
+    return this.http.post<LiveRouteResult>(`${this.apiUrl}/navigation/live-route`, {
+      location: {
+        type: 'Point',
+        coordinates: [longitude, latitude]
+      },
+      toBuildingId,
+      mode,
+      destinationInterest
+    });
   }
 
   getRouteGuides(routeId: number) {
