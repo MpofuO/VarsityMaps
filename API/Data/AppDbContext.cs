@@ -56,6 +56,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .HasColumnType("geometry");
             entity.Property(e => e.TransitionLocation)
                 .HasColumnType("geometry");
+            entity.Property(e => e.OriginParkingLocation)
+                .HasColumnType("geometry");
         });
 
         builder.Entity<Edge>(entity =>

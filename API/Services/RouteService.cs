@@ -1,5 +1,6 @@
 using API.DTOs;
 using API.Entities;
+using API.Helpers;
 using API.Interfaces;
 using NetTopologySuite.Geometries;
 using Route = API.Entities.Route;
@@ -75,25 +76,34 @@ public class RouteService : IRouteService
 
         foreach (var vLeg in vehicularLeg)
         {
-            var matchingWalkLeg = walkingLeg.FirstOrDefault(w => w.FromNodeId == vLeg.ToNodeId);
+            var matchingWalkLeg = walkingLeg.OrderBy(w => w.Weight).FirstOrDefault();
             if (matchingWalkLeg == null) continue;
 
-            var parkingNode = parkingAccessNodes.FirstOrDefault(n => n.NodeId == vLeg.ToNodeId);
-            if (parkingNode is null) continue;
+            var vehicleParkingNode = parkingAccessNodes.FirstOrDefault(n => n.NodeId == vLeg.ToNodeId);
+            var walkingParkingNode = parkingAccessNodes.FirstOrDefault(n => n.NodeId == matchingWalkLeg.FromNodeId);
+            if (vehicleParkingNode is null || walkingParkingNode is null) continue;
 
             var vCoords = vLeg.Path.Coordinates;
             var wCoords = matchingWalkLeg.Path.Coordinates;
-            var combinedCoords = vCoords.Concat(wCoords.Skip(1)).ToArray();
+            var parkingConnection = vehicleParkingNode.NodeId == walkingParkingNode.NodeId
+                ? Array.Empty<Coordinate>()
+                : [wCoords[0]];
+            var parkingConnectionWeight = vehicleParkingNode.NodeId == walkingParkingNode.NodeId
+                ? 0
+                : (decimal)GeoHelper.DegreeDistanceToMeters(
+                    vehicleParkingNode.Location.Distance(walkingParkingNode.Location),
+                    walkingParkingNode.Location.Y);
+            var combinedCoords = vCoords.Concat(parkingConnection).Concat(wCoords.Skip(1)).ToArray();
 
             multiLegRoutes.Add(new Route
             {
                 Path = new LineString(combinedCoords),
                 FromNodeId = vLeg.FromNodeId,
                 ToNodeId = matchingWalkLeg.ToNodeId,
-                Weight = vLeg.Weight + matchingWalkLeg.Weight,
-                TransitionNodeId = parkingNode.NodeId,
-                TransitionParkingAreaId = parkingNode.ParkingAreaId,
-                TransitionLocation = new Point(vCoords[^1]) { SRID = 4326 },
+                Weight = vLeg.Weight + parkingConnectionWeight + matchingWalkLeg.Weight,
+                TransitionNodeId = walkingParkingNode.NodeId,
+                TransitionParkingAreaId = walkingParkingNode.ParkingAreaId,
+                TransitionLocation = new Point(wCoords[0]) { SRID = 4326 },
                 RouteGuides = []
             });
 
@@ -101,6 +111,83 @@ public class RouteService : IRouteService
         }
 
         return multiLegRoutes;
+    }
+
+    public List<Route> GetParkingOriginPath(IReadOnlyList<Edge> drivingEdges, IReadOnlyList<Edge> walkingEdges,
+        IEnumerable<Node> originParkingNodes, IEnumerable<Node> destinationEntrances,
+        IEnumerable<Node> parkingAccessNodes)
+    {
+        var originNodes = originParkingNodes.ToList();
+        var destinationNodes = destinationEntrances.ToList();
+        var parkingNodes = parkingAccessNodes.ToList();
+        if (!originNodes.Any() || !parkingNodes.Any() || !destinationNodes.Any()) return [];
+
+        var originParkingAreaId = originNodes
+            .Select(n => n.ParkingAreaId)
+            .FirstOrDefault(id => id is not null);
+        var destinationParkingAreaId = parkingNodes
+            .Select(n => n.ParkingAreaId)
+            .FirstOrDefault(id => id is not null);
+
+        if (originParkingAreaId is not null && originParkingAreaId == destinationParkingAreaId)
+        {
+            var walkingRoutes = GetShortestPath(walkingEdges, originNodes, destinationNodes);
+
+            return walkingRoutes.Select(route =>
+            {
+                var originNode = originNodes.First(n => n.NodeId == route.FromNodeId);
+                route.OriginParkingNodeId = originNode.NodeId;
+                route.OriginParkingAreaId = originNode.ParkingAreaId;
+                route.OriginParkingLocation = new Point(route.Path.Coordinates[0]) { SRID = 4326 };
+                return route;
+            }).ToList();
+        }
+
+        var vehicularLegs = GetShortestPath(drivingEdges, originNodes, parkingNodes);
+        var walkingLegs = GetShortestPath(walkingEdges, parkingNodes, destinationNodes);
+        var routes = new List<Route>();
+
+        foreach (var vehicleLeg in vehicularLegs)
+        {
+            // The best walking access point can differ from the access point used by the vehicle leg.
+            var walkingLeg = walkingLegs.OrderBy(w => w.Weight).FirstOrDefault();
+            if (walkingLeg is null) continue;
+
+            var originNode = originNodes.FirstOrDefault(n => n.NodeId == vehicleLeg.FromNodeId);
+            var vehicleParkingNode = parkingNodes.FirstOrDefault(n => n.NodeId == vehicleLeg.ToNodeId);
+            var walkingParkingNode = parkingNodes.FirstOrDefault(n => n.NodeId == walkingLeg.FromNodeId);
+            if (originNode is null || vehicleParkingNode is null || walkingParkingNode is null) continue;
+
+            var vehicleCoords = vehicleLeg.Path.Coordinates;
+            var walkingCoords = walkingLeg.Path.Coordinates;
+            var parkingConnection = vehicleParkingNode.NodeId == walkingParkingNode.NodeId
+                ? Array.Empty<Coordinate>()
+                : [walkingCoords[0]];
+            var parkingConnectionWeight = vehicleParkingNode.NodeId == walkingParkingNode.NodeId
+                ? 0
+                : (decimal)GeoHelper.DegreeDistanceToMeters(
+                    vehicleParkingNode.Location.Distance(walkingParkingNode.Location),
+                    walkingParkingNode.Location.Y);
+
+            routes.Add(new Route
+            {
+                Path = new LineString(vehicleCoords.Concat(parkingConnection).Concat(walkingCoords.Skip(1)).ToArray()),
+                FromNodeId = vehicleLeg.FromNodeId,
+                ToNodeId = walkingLeg.ToNodeId,
+                Weight = vehicleLeg.Weight + parkingConnectionWeight + walkingLeg.Weight,
+                OriginParkingNodeId = originNode.NodeId,
+                OriginParkingAreaId = originNode.ParkingAreaId,
+                OriginParkingLocation = new Point(vehicleCoords[0]) { SRID = 4326 },
+                TransitionNodeId = walkingParkingNode.NodeId,
+                TransitionParkingAreaId = walkingParkingNode.ParkingAreaId,
+                TransitionLocation = new Point(walkingCoords[0]) { SRID = 4326 },
+                RouteGuides = []
+            });
+
+            if (routes.Count >= MaxRoutes) break;
+        }
+
+        return routes;
     }
 
     public List<RouteGuideDto> GetRouteGuides(Route route, string? parkingAreaName = null)
@@ -111,6 +198,7 @@ public class RouteService : IRouteService
 
         var coords = route.Path.Coordinates;
         int stepIndex = 0;
+        var startsWalkingFromParking = route.OriginParkingAreaId is not null && route.TransitionParkingAreaId is null;
         var transitionIndex = route.TransitionLocation is null
             ? -1
             : Array.FindIndex(coords, coordinate => SameCoordinate(coordinate, route.TransitionLocation.Coordinate));
@@ -119,11 +207,20 @@ public class RouteService : IRouteService
         {
             StepIndex = stepIndex++,
             Location = new Point(coords[0]) { SRID = 4326 },
-            TravelMode = route.TravelMode,
-            Instruction = route.TravelMode switch
+            TravelMode = startsWalkingFromParking ? TravelMode.Walking : route.TravelMode,
+            Instruction = startsWalkingFromParking
+                ? "You are parked here. Walk to your destination."
+                : route.TransitionLocation is not null
+                ? route.TravelMode switch
+                {
+                    TravelMode.Car => "Start driving towards your destination parking area",
+                    TravelMode.Bus => "Board the bus towards your destination parking area",
+                    _ => "Start walking towards your destination"
+                }
+                : route.TravelMode switch
             {
-                TravelMode.Car => "Start driving towards your destination parking area",
-                TravelMode.Bus => "Board the bus towards your destination parking area",
+                TravelMode.Car => "Start driving towards your destination",
+                TravelMode.Bus => "Board the bus towards your destination",
                 _ => "Start walking towards your destination"
             }
         });
@@ -133,7 +230,7 @@ public class RouteService : IRouteService
             var prevCoord = coords[i - 1];
             var currentCoord = coords[i];
             var isTransition = i == transitionIndex;
-            var currentTravelMode = transitionIndex >= 0 && i >= transitionIndex
+            var currentTravelMode = startsWalkingFromParking || (transitionIndex >= 0 && i >= transitionIndex)
                 ? TravelMode.Walking
                 : route.TravelMode;
 
@@ -182,7 +279,9 @@ public class RouteService : IRouteService
             StepIndex = stepIndex,
             Location = new Point(coords[^1]) { SRID = 4326 },
             Instruction = "Proceed to the entrance. You have arrived at your destination",
-            TravelMode = route.TransitionLocation is null ? route.TravelMode : TravelMode.Walking,
+            TravelMode = startsWalkingFromParking || route.TransitionLocation is not null
+                ? TravelMode.Walking
+                : route.TravelMode,
             ParkingAreaId = route.TransitionLocation is null ? null : route.TransitionParkingAreaId
         });
 
@@ -324,8 +423,17 @@ public class RouteService : IRouteService
         return lookup;
     }
 
-    private static LineString BuildLineString(List<Node> path) =>
-        new(path.Select(n => new Coordinate(n.Location.X, n.Location.Y)).ToArray());
+    private static LineString BuildLineString(List<Node> path)
+    {
+        var coordinates = path
+            .Select(n => new Coordinate(n.Location.X, n.Location.Y))
+            .ToList();
+
+        if (coordinates.Count == 1)
+            coordinates.Add(new Coordinate(coordinates[0].X, coordinates[0].Y));
+
+        return new LineString(coordinates.ToArray());
+    }
 
     #endregion
 }

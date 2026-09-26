@@ -141,7 +141,9 @@ public static class DtoExtensions
             ToBuildingId = route.ToBuildingId,
             TravelMode = route.TravelMode,
             TransitionParkingAreaId = route.TransitionParkingAreaId,
-            TransitionLocation = route.TransitionLocation
+            TransitionLocation = route.TransitionLocation,
+            OriginParkingAreaId = route.OriginParkingAreaId,
+            OriginParkingLocation = route.OriginParkingLocation
         };
     }
 

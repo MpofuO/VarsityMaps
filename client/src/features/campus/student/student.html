@@ -32,6 +32,11 @@
             <div class="p-3 bg-primary/10 border border-primary/20 rounded-box space-y-1">
               <div class="text-xs text-primary font-bold uppercase tracking-wider">Current Instruction</div>
               <div class="text-sm font-semibold">{{ currentInstruction() }}</div>
+              @if (currentGuide(); as guide) {
+                @if (guide.isTransition) {
+                <div class="badge badge-warning badge-sm">Continue on foot after parking</div>
+                }
+              }
               <div class="text-xs text-base-content/70">
                 Distance Remaining: <span class="font-bold">{{ remainingRouteDistance() }} m</span>
               </div>
@@ -90,8 +95,30 @@
             }
           </div>
 
+          @if (originParkingOptions().length > 0) {
+            <div class="rounded-btn border border-warning/40 bg-warning/10 p-3 space-y-2">
+              <div>
+                <div class="text-xs font-bold uppercase tracking-wider text-warning-content">Choose where you parked</div>
+                <p class="text-xs text-base-content/70 mt-1">A direct {{ selectedTravelMode() === 8 ? 'driving' : 'bus' }} route is unavailable from this origin.</p>
+              </div>
+              <div class="space-y-1">
+                @for (parkingArea of originParkingOptions(); track parkingArea.parkingAreaId) {
+                  <button type="button" class="btn btn-sm w-full justify-between"
+                    [class.btn-warning]="originParkingAreaId() === parkingArea.parkingAreaId"
+                    [class.btn-outline]="originParkingAreaId() !== parkingArea.parkingAreaId"
+                    (click)="selectOriginParkingArea(parkingArea.parkingAreaId)">
+                    <span>{{ parkingArea.name }}</span>
+                    <span class="badge badge-ghost badge-sm">{{ parkingArea.accessNodeIds.length }} access point(s)</span>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           @if (originBuildingId() && destinationBuildingId() && routes().length === 0) {
-            <button class="btn btn-success btn-sm w-full text-success-content" [disabled]="isCalculatingRoute()" (click)="calculateRoute()">
+            <button class="btn btn-success btn-sm w-full text-success-content"
+              [disabled]="isCalculatingRoute() || (originParkingOptions().length > 0 && originParkingAreaId() === null)"
+              (click)="calculateRoute()">
               @if (isCalculatingRoute()) {
                 <span class="loading loading-spinner loading-xs"></span>
               }
@@ -117,6 +144,9 @@
                     <div>
                       <span class="font-bold">Option {{ $index + 1 }}</span>
                       <span class="text-base-content/60 ml-2">{{ r.distanceMeters | number:'1.0-0' }} m</span>
+                      @if (r.transitionParkingAreaId) {
+                        <span class="badge badge-warning badge-xs ml-2">Parking transfer</span>
+                      }
                     </div>
                     <span class="font-medium text-success">{{ r.estimatedTravelTimeMinutes }} min</span>
                   </div>
@@ -147,7 +177,7 @@
             </div>
             <div class="flex flex-wrap gap-1">
               @for (b of recentSearches; track b.buildingId) {
-                <button class="btn btn-xs btn-ghost border border-base-300" (click)="selectBuilding(b.buildingId)">
+                <button class="btn btn-xs btn-ghost border border-base-300" (click)="selectBuilding(b.buildingId.toString())">
                   {{ b.name }}
                 </button>
               }
@@ -192,7 +222,7 @@
               class="flex items-center justify-between rounded-btn px-2 py-1.5 cursor-pointer text-sm transition-colors"
               [class.bg-primary/10]="building.buildingId === selectedBuildingId() || building.buildingId === originBuildingId() || building.buildingId === destinationBuildingId()"
               [class.hover:bg-base-200]="building.buildingId !== selectedBuildingId()"
-              (click)="selectBuilding(building.buildingId)"
+              (click)="selectBuilding(building.buildingId.toString())"
             >
               <span class="truncate">{{ building.name }}</span>
               <span class="badge badge-ghost badge-xs shrink-0">{{ building.alias }}</span>
@@ -213,6 +243,7 @@
     <div class="relative w-full h-full min-h-0">
       <app-campus-map
         [polygons]="mapPolygons()"
+        [markers]="routeMarkers()"
         [polylines]="routePolylines()"
         [center]="campusCenter()"
         [isStudent]="true"

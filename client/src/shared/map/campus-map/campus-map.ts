@@ -21,8 +21,8 @@ export class CampusMap implements AfterViewInit {
   isStudent = input<boolean>(false);
 
   mapClick = output<google.maps.LatLng>();
-  polygonClick = output<number>();
-  polygonDblClick = output<number>();
+  polygonClick = output<string>();
+  polygonDblClick = output<string>();
   markerClick = output<number>();
   markerDblClick = output<number>();
   polylineClick = output<number>();
@@ -32,7 +32,7 @@ export class CampusMap implements AfterViewInit {
   @ViewChild('mapContainer') private mapContainer?: ElementRef<HTMLDivElement>;
 
   private map?: google.maps.Map;
-  private readonly renderedPolygons = new Map<number, google.maps.Polygon>();
+  private readonly renderedPolygons = new Map<string, google.maps.Polygon>();
   private readonly renderedMarkers = new Map<number, google.maps.Marker>();
   private readonly renderedPolylines = new Map<number, google.maps.Polyline>();
   private readonly isReady = signal(false);
@@ -91,10 +91,10 @@ export class CampusMap implements AfterViewInit {
 
       const options: google.maps.PolygonOptions = {
         paths: item.paths,
-        strokeColor: item.selected ? '#3b82f6' : '#7c3aed',
+        strokeColor: item.selected ? '#3b82f6' : (item.strokeColor ?? '#7c3aed'),
         strokeWeight: item.selected ? 3 : 2,
         strokeOpacity: isHiddenForStudent ? 0 : 1,
-        fillColor: item.selected ? '#1d4ed8' : '#8b5cf6',
+        fillColor: item.selected ? '#1d4ed8' : (item.fillColor ?? '#8b5cf6'),
         fillOpacity: isHiddenForStudent ? 0 : item.selected ? 0.50 : 0.40,
         clickable: true,
         zIndex: item.selected ? 10 : 1
@@ -166,7 +166,7 @@ export class CampusMap implements AfterViewInit {
         path: item.path,
         strokeColor: item.selected ? '#22c55e' : (item.color ?? '#64748b'),
         strokeWeight: item.selected ? 10 : 6,
-        zIndex: item.selected ? 5 : 1
+        zIndex: item.selected ? 10 : 3
       };
 
       const existing = this.renderedPolylines.get(item.id);

@@ -1,14 +1,17 @@
 // #region Imports
 import { Component, HostListener, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { BuildingService } from '../../../../core/services/building-service';
+import { ParkingAreaService } from '../../../../core/services/parking-area-service';
 import { CampusService } from '../../../../core/services/campus-service';
 import { ToastService } from '../../../../core/services/toast-service';
 import { AddNodeItem, NodeService } from '../../../../core/services/node-service';
 import { EdgeService } from '../../../../core/services/edge-service';
 import { AccountService } from '../../../../core/services/account-service';
 import { CampusBuilding } from '../campus-building/campus-building';
+import { CampusParkingArea } from '../campus-parking-area/campus-parking-area';
 import { Campus } from '../../../../types/campus';
 import { Building, BuildingModel } from '../../../../types/building';
+import { ParkingArea, ParkingAreaModel } from '../../../../types/parking-area';
 import { Node } from '../../../../types/node';
 import { Edge, TravelMode } from '../../../../types/edge';
 import { CampusMap } from '../../../../shared/map/campus-map/campus-map';
@@ -23,9 +26,11 @@ import { Observable, Subject, take } from 'rxjs';
 // #endregion
 
 type EditorMode = 'view' | 'draw-building'
+  | 'draw-parking-area'
   | 'place-nodes' | 'place-entrance' | 'connect-nodes'
+  | 'place-parking-access'
   | 'select-edges' | 'select-path-range';
-type EditorTab = 'buildings' | 'nodes' | 'paths';
+type EditorTab = 'buildings' | 'parking-areas' | 'nodes' | 'paths';
 
 @Component({
   selector: 'app-campus-admin',
@@ -35,6 +40,7 @@ type EditorTab = 'buildings' | 'nodes' | 'paths';
     Modal,
     ToLatLngPipe,
     CampusBuilding,
+    CampusParkingArea,
     CampusNode,
     CampusPaths
   ],
@@ -44,12 +50,14 @@ type EditorTab = 'buildings' | 'nodes' | 'paths';
 export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #region View & Map Refs
   @ViewChild(CampusBuilding) buildingsChild?: CampusBuilding;
+  @ViewChild(CampusParkingArea) parkingAreasChild?: CampusParkingArea;
   @ViewChild(CampusNode) nodesChild?: CampusNode;
   private map?: google.maps.Map;
   // #endregion
 
   // #region Injected Services
   private readonly buildingService = inject(BuildingService);
+  private readonly parkingAreaService = inject(ParkingAreaService);
   private readonly campusService = inject(CampusService);
   private readonly toastService = inject(ToastService);
   private readonly nodeService = inject(NodeService);
@@ -60,6 +68,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #region Campus & Loaded Data Properties
   protected readonly campus = signal<Campus | null>(null);
   protected readonly buildings = signal<Building[]>([]);
+  protected readonly parkingAreas = signal<ParkingArea[]>([]);
   protected readonly nodes = signal<Node[]>([]);
   protected readonly edges = signal<Edge[]>([]);
   // #endregion
@@ -73,7 +82,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly isLeaveConfirmOpen = signal(false);
   private leaveConfirmSubject: Subject<boolean> | null = null;
   hasUnsavedWork = computed(() => {
-    return this.mode() === 'draw-building' || this.mode() === 'place-nodes' || this.mode() === 'connect-nodes';
+    return this.mode() === 'draw-building' || this.mode() === 'draw-parking-area' ||
+      this.mode() === 'place-nodes' || this.mode() === 'place-parking-access' || this.mode() === 'connect-nodes';
   });
 
   canDeactivate(): boolean | Observable<boolean> {
@@ -108,6 +118,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   // #region Buildings Properties
   protected readonly selectedBuildingId = signal<number | null>(null);
+  protected readonly selectedParkingAreaId = signal<number | null>(null);
   protected readonly draftPath = signal<google.maps.LatLngLiteral[]>([]);
   private draftBoundaryLine?: google.maps.Polyline;
   // #endregion
@@ -124,6 +135,9 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly isEntranceConfirmOpen = signal(false);
   protected readonly draftEntrancePoint = signal<google.maps.LatLngLiteral | null>(null);
   protected readonly entranceName = signal('');
+  protected readonly parkingAccessTarget = signal<ParkingArea | null>(null);
+  protected readonly isParkingAccessConfirmOpen = signal(false);
+  protected readonly parkingAccessName = signal('');
   // #endregion
 
   // #region Paths(Edges) Properties
@@ -153,13 +167,22 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #endregion
 
   // #region Map Bindings (computed)
-  protected readonly mapPolygons = computed(() =>
-    this.buildings().map((b) => ({
-      id: b.buildingId,
+  protected readonly mapPolygons = computed(() => [
+    ...this.buildings().map((b) => ({
+      id: `building-${b.buildingId}`,
       paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
-      selected: b.buildingId === this.selectedBuildingId()
+      selected: b.buildingId === this.selectedBuildingId(),
+      strokeColor: '#7c3aed',
+      fillColor: '#8b5cf6'
+    })),
+    ...this.parkingAreas().map((p) => ({
+      id: `parking-${p.parkingAreaId}`,
+      paths: p.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
+      selected: p.parkingAreaId === this.selectedParkingAreaId(),
+      strokeColor: '#0891b2',
+      fillColor: '#06b6d4'
     }))
-  );
+  ]);
 
   protected readonly nodeMarkers = computed<MapMarker[]>(() => {
     const first = this.connectFirstNodeId();
@@ -173,7 +196,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     }
 
     return this.nodes().map((n) => {
-      let color = n.buildingId ? '#FF8A3D' : '#16202A';
+      let color = n.buildingId ? '#FF8A3D' : n.parkingAreaId ? '#FFCE1B' : '#16202A';
       if (this.mode() === 'connect-nodes') {
         if (n.nodeId === first || n.nodeId === second) {
           color = '#3b82f6';
@@ -226,6 +249,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       this.campusService.getCampus(userCampusId).subscribe({ next: (c) => this.campus.set(c) });
     }
     this.buildingService.getBuildings().subscribe({ next: (b) => this.buildings.set(b) });
+    this.parkingAreaService.getParkingAreas().subscribe({ next: (p) => this.parkingAreas.set(p) });
     this.nodeService.getNodes().subscribe({ next: (n) => this.nodes.set(n) });
     this.edgeService.getEdges().subscribe({ next: (e) => this.edges.set(e) });
   }
@@ -252,6 +276,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   private applyTabSwitch(tab: EditorTab): void {
     this.activeTab.set(tab);
     this.selectedBuildingId.set(null);
+    this.selectedParkingAreaId.set(null);
     this.selectedNodeId.set(null);
     this.selectedEdgeId.set(null);
     this.cancelMode();
@@ -268,6 +293,9 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.clearDraftPointMarkers();
     this.entranceTargetBuilding.set(null);
     this.draftEntrancePoint.set(null);
+    this.parkingAccessTarget.set(null);
+    this.draftEntrancePoint.set(null);
+    this.isParkingAccessConfirmOpen.set(false);
     this.connectFirstNodeId.set(null);
     this.connectSecondNodeId.set(null);
     this.rangeStartNodeId.set(null);
@@ -300,6 +328,18 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       return;
     }
 
+    if (this.mode() === 'draw-parking-area') {
+      const path = this.draftPath();
+      if (path.length >= 3 && this.isNearFirstVertex(point, path[0])) {
+        this.finishDrawing();
+        return;
+      }
+      const nextPath = [...path, point];
+      this.draftPath.set(nextPath);
+      this.renderDraftBoundary(nextPath);
+      return;
+    }
+
     if (this.mode() === 'place-nodes') {
       if (this.isPointInAnyBuilding(point)) {
         this.toastService.error('That point is inside a building — pick a point outside it.');
@@ -315,6 +355,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     if (this.mode() === 'place-entrance') {
       this.draftEntrancePoint.set(point);
       this.isEntranceConfirmOpen.set(true);
+    }
+
+    if (this.mode() === 'place-parking-access') {
+      this.draftEntrancePoint.set(point);
+      this.isParkingAccessConfirmOpen.set(true);
     }
   }
 
@@ -400,10 +445,27 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     }
   }
 
-  onBuildingDblClick(id: number): void {
-    if (this.activeTab() === 'buildings') {
+  onPolygonClick(key: string): void {
+    const [kind, idText] = key.split('-');
+    const id = Number(idText);
+    if (!Number.isInteger(id)) return;
+
+    if (kind === 'building') this.selectBuilding(id);
+    if (kind === 'parking') this.selectParkingArea(id);
+  }
+
+  onPolygonDblClick(key: string): void {
+    const [kind, idText] = key.split('-');
+    const id = Number(idText);
+    if (!Number.isInteger(id)) return;
+
+    if (kind === 'building' && this.activeTab() === 'buildings') {
       this.selectedBuildingId.set(id);
       this.buildingsChild?.openEditFromParent(id);
+    }
+    if (kind === 'parking' && this.activeTab() === 'parking-areas') {
+      this.selectedParkingAreaId.set(id);
+      this.parkingAreasChild?.openEditFromParent(id);
     }
   }
 
@@ -431,12 +493,19 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.mode.set('draw-building');
   }
 
+  startDrawingParkingArea(): void {
+    this.selectedParkingAreaId.set(null);
+    this.draftPath.set([]);
+    this.mode.set('draw-parking-area');
+  }
+
   finishDrawing(): void {
     if (this.draftPath().length < 3) {
       this.toastService.error('A building outline needs at least three points.');
       return;
     }
-    this.buildingsChild?.openCreate();
+    if (this.mode() === 'draw-building') this.buildingsChild?.openCreate();
+    if (this.mode() === 'draw-parking-area') this.parkingAreasChild?.openCreate();
   }
 
   handleCreateBuilding(modelData: Omit<BuildingModel, 'boundary'>): void {
@@ -472,6 +541,39 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     });
   }
 
+  handleCreateParkingArea(modelData: Omit<ParkingAreaModel, 'boundary'>): void {
+    const model: ParkingAreaModel = { ...modelData, boundary: toGeoPolygon(this.draftPath()) };
+    this.parkingAreaService.addParkingArea(model).subscribe({
+      next: () => {
+        this.toastService.success('Parking area added.');
+        this.cancelMode();
+        this.load();
+      }
+    });
+  }
+
+  handleUpdateParkingArea(data: { id: number; model: Omit<ParkingAreaModel, 'boundary'> }): void {
+    const parkingArea = this.parkingAreas().find((area) => area.parkingAreaId === data.id);
+    if (!parkingArea) return;
+
+    const model: ParkingAreaModel = { ...data.model, boundary: parkingArea.boundary };
+    this.parkingAreaService.updateParkingArea(data.id, model).subscribe({
+      next: () => {
+        this.toastService.success('Parking area updated.');
+        this.load();
+      }
+    });
+  }
+
+  handleDeleteParkingArea(id: number): void {
+    this.parkingAreaService.deleteParkingArea(id).subscribe({
+      next: () => {
+        this.toastService.success('Parking area deleted.');
+        this.load();
+      }
+    });
+  }
+
   selectBuilding(id: number): void {
     if (this.activeTab() !== 'buildings') return;
     const isSelected = id === this.selectedBuildingId();
@@ -482,6 +584,20 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       const building = this.buildings().find((b) => b.buildingId === selectedId);
       if (building?.boundary?.coordinates[0]?.[0]) {
         const [lng, lat] = building.boundary.coordinates[0][0];
+        this.panTo(lng, lat);
+      }
+    }
+  }
+
+  selectParkingArea(id: number): void {
+    if (this.activeTab() !== 'parking-areas') return;
+    const selectedId = id === this.selectedParkingAreaId() ? null : id;
+    this.selectedParkingAreaId.set(selectedId);
+
+    if (selectedId !== null) {
+      const parkingArea = this.parkingAreas().find((area) => area.parkingAreaId === selectedId);
+      if (parkingArea?.boundary?.coordinates[0]?.[0]) {
+        const [lng, lat] = parkingArea.boundary.coordinates[0][0];
         this.panTo(lng, lat);
       }
     }
@@ -614,6 +730,12 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     this.mode.set('place-entrance');
   }
 
+  startParkingAccessNode(parkingArea: ParkingArea): void {
+    this.parkingAccessTarget.set(parkingArea);
+    this.parkingAccessName.set('');
+    this.mode.set('place-parking-access');
+  }
+
   confirmEntrance(): void {
     const building = this.entranceTargetBuilding();
     const point = this.draftEntrancePoint();
@@ -628,6 +750,26 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         this.load();
       },
       error: () => this.isEntranceConfirmOpen.set(false)
+    });
+  }
+
+  confirmParkingAccessNode(): void {
+    const parkingArea = this.parkingAccessTarget();
+    const point = this.draftEntrancePoint();
+    const name = this.parkingAccessName().trim();
+    if (!parkingArea || !point || !name) return;
+
+    this.nodeService.addParkingAccessNode(parkingArea.parkingAreaId, name, {
+      type: 'Point',
+      coordinates: [point.lng, point.lat]
+    }).subscribe({
+      next: () => {
+        this.toastService.success('Parking access node added.');
+        this.isParkingAccessConfirmOpen.set(false);
+        this.cancelMode();
+        this.load();
+      },
+      error: () => this.isParkingAccessConfirmOpen.set(false)
     });
   }
   // #endregion

@@ -14,4 +14,6 @@ public class RouteDto
     public TravelMode TravelMode { get; set; }
     public int? TransitionParkingAreaId { get; set; }
     public Point? TransitionLocation { get; set; }
+    public int? OriginParkingAreaId { get; set; }
+    public Point? OriginParkingLocation { get; set; }
 }

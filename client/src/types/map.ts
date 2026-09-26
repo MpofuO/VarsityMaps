@@ -1,7 +1,9 @@
 export interface MapPolygon {
-  id: number;
+  id: string;
   paths: google.maps.LatLngLiteral[];
   selected?: boolean;
+  strokeColor?: string;
+  fillColor?: string;
 }
 
 export interface MapMarker {

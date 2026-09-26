@@ -20,6 +20,12 @@
       </button>
 
       <button type="button" class="btn btn-xs rounded-full px-3 transition-all"
+        [class.btn-primary]="activeTab() === 'parking-areas'" [class.btn-ghost]="activeTab() !== 'parking-areas'"
+        (click)="switchTab('parking-areas')">
+        Parking
+      </button>
+
+      <button type="button" class="btn btn-xs rounded-full px-3 transition-all"
         [class.btn-primary]="activeTab() === 'nodes'" [class.btn-ghost]="activeTab() !== 'nodes'"
         (click)="switchTab('nodes')">
         Nodes
@@ -42,6 +48,14 @@
       (deleteBuilding)="handleDeleteBuilding($event)" (addEntrance)="startEntrance($event)" />
     }
 
+    @if (activeTab() === 'parking-areas') {
+    <app-campus-parking-area [parkingAreas]="parkingAreas()" [selectedParkingAreaId]="selectedParkingAreaId()"
+      [isDrawing]="mode() === 'draw-parking-area'" (startDrawing)="startDrawingParkingArea()"
+      (selectParkingArea)="selectParkingArea($event)" (createParkingArea)="handleCreateParkingArea($event)"
+      (updateParkingArea)="handleUpdateParkingArea($event)" (deleteParkingArea)="handleDeleteParkingArea($event)"
+      (addAccessNode)="startParkingAccessNode($event)" />
+    }
+
     @if (activeTab() === 'nodes') {
     <app-campus-node [nodes]="nodes()" [isPlacingNodes]="mode() === 'place-nodes'" [selectedNodeId]="selectedNodeId()"
       [isConnecting]="mode() === 'connect-nodes'" (startConnecting)="startConnecting()"
@@ -62,7 +76,7 @@
     <div class="relative w-full h-full min-h-0">
       <app-campus-map [polygons]="mapPolygons()" [markers]="nodeMarkers()" [polylines]="edgePolylines()"
         [center]="campus()?.center! | toLatLngPipe" (mapClick)="onMapClick($event)"
-        (polygonClick)="selectBuilding($event)" (polygonDblClick)="onBuildingDblClick($event)"
+        (polygonClick)="onPolygonClick($event)" (polygonDblClick)="onPolygonDblClick($event)"
         (markerClick)="onMarkerClick($event)" (markerDblClick)="onMarkerDblClick($event)"
         (polylineClick)="onPolylineClick($event)" (polylineDblClick)="onPolylineDblClick($event)"
         (ready)="onMapReady($event)" />
@@ -88,6 +102,15 @@
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">
           Cancel
         </button>
+      </div>
+      }
+
+      @if (mode() === 'draw-parking-area') {
+      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
+        <span class="text-xs font-medium">{{ draftPath().length }} point(s) placed</span>
+        <div class="divider divider-horizontal my-0 py-1"></div>
+        <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftPath().length < 3" (click)="finishDrawing()">Finish Shape</button>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
       </div>
       }
 
@@ -121,6 +144,13 @@
       <div
         class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
         <span class="text-xs font-medium">Click within 5m of {{ entranceTargetBuilding()?.name }}'s boundary</span>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
+      </div>
+      }
+
+      @if (mode() === 'place-parking-access') {
+      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+        <span class="text-xs font-medium">Click within 5m of {{ parkingAccessTarget()?.name }}'s boundary</span>
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
       </div>
       }
@@ -225,6 +255,18 @@
     <div class="modal-action">
       <button class="btn btn-ghost btn-sm" (click)="isBulkDeleteConfirmOpen.set(false)">Cancel</button>
       <button class="btn btn-error btn-sm" (click)="confirmBulkDelete()">Delete Paths</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="isParkingAccessConfirmOpen()" title="Add parking access node" (closed)="isParkingAccessConfirmOpen.set(false)">
+  <div class="space-y-4">
+    <p class="text-sm">Add an access node here for <span class="font-semibold">{{ parkingAccessTarget()?.name }}</span>?</p>
+    <input class="input input-bordered input-sm w-full" placeholder="Access node name (e.g. Main Entrance)"
+      [value]="parkingAccessName()" (input)="parkingAccessName.set($any($event.target).value)" />
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="isParkingAccessConfirmOpen.set(false)">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!parkingAccessName().trim()" (click)="confirmParkingAccessNode()">Add access node</button>
     </div>
   </div>
 </app-modal>

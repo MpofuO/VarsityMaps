@@ -6,6 +6,7 @@ using API.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using NetTopologySuite.Geometries;
 
 namespace API.Controllers;
 
@@ -16,9 +17,8 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
 {
     [HttpGet("route")]
     public async Task<ActionResult<IEnumerable<RouteDto>>> GetRoute(
-        [FromQuery] int fromBuildingId,
-        [FromQuery] int toBuildingId,
-        [FromQuery] TravelMode mode = TravelMode.Walking)
+        [FromQuery] int fromBuildingId, [FromQuery] int toBuildingId,
+        [FromQuery] TravelMode mode = TravelMode.Walking, [FromQuery] int? originParkingAreaId = null)
     {
         if (fromBuildingId == toBuildingId)
             return BadRequest("Origin and destination must be different buildings.");
@@ -35,7 +35,15 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         if (fromBuilding.CampusId != campusId || toBuilding.CampusId != campusId)
             return BadRequest("Both buildings must belong to the campus you're currently viewing.");
 
-        var cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(fromBuildingId, toBuildingId, mode);
+        var cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
+            fromBuildingId, toBuildingId, mode, null);
+
+        if (cachedRoutes.Count == 0 && originParkingAreaId is not null)
+        {
+            cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
+                fromBuildingId, toBuildingId, mode, originParkingAreaId);
+        }
+
         if (cachedRoutes.Count > 0)
         {
             foreach (var cachedRoute in cachedRoutes)
@@ -50,39 +58,83 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
 
         var fromEntrances = await uow.NodeRepository.GetByBuildingAsync(fromBuildingId);
         var toEntrances = await uow.NodeRepository.GetByBuildingAsync(toBuildingId);
-        if (!fromEntrances.Any() || !toEntrances.Any())
-            return BadRequest("One or both buildings have no registered entrances.");
+        if (!toEntrances.Any() || (mode != TravelMode.Car && mode != TravelMode.Bus && !fromEntrances.Any()))
+            return BadRequest("The destination or origin building has no registered entrances.");
 
         List<Route> routes;
+        ParkingArea? selectedOriginParkingArea = null;
+        int? routeOriginParkingAreaId = null;
 
         if (mode == TravelMode.Car || mode == TravelMode.Bus)
         {
             var drivingEdges = isGuest
                 ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, mode)
                 : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, mode);
-
-            var walkingEdges = isGuest
-                ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, TravelMode.Walking)
-                : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, TravelMode.Walking);
-
             drivingEdges = drivingEdges.Where(e => !(e.IsClosed && (e.ClosedUntil == null || e.ClosedUntil > DateTime.UtcNow))).ToList();
-            walkingEdges = walkingEdges.Where(e => !(e.IsClosed && (e.ClosedUntil == null || e.ClosedUntil > DateTime.UtcNow))).ToList();
 
-            var parkingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
-            var accessibleParkingAreas = parkingAreas
-                .Where(p => p.IsAccessible && (!isGuest || p.IsGuestAccessible))
-                .ToList();
+            //First try to find a direct route between the two buildings. If none exists, then we will require the user to select a parking area.
+            routes = routeService.GetShortestPath(drivingEdges, fromEntrances, toEntrances);
 
-            if (!accessibleParkingAreas.Any())
-                return BadRequest("No accessible parking areas found on this campus.");
+            if (!routes.Any())
+            {
+                var parkingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
+                var accessibleParkingAreas = parkingAreas
+                    .Where(p => p.IsAccessible && (!isGuest || p.IsGuestAccessible) && p.AccessNodes.Any())
+                    .ToList();
 
-            var parkingAccessNodes = accessibleParkingAreas.SelectMany(p => p.AccessNodes).ToList();
+                if (!accessibleParkingAreas.Any())
+                    return BadRequest("No route could be found for this mode of travel.");
 
-            routes = routeService.GetMultiLegPath(drivingEdges, walkingEdges, fromEntrances, toEntrances, parkingAccessNodes);
+                if (originParkingAreaId is null)
+                {
+                    return Conflict(new OriginParkingRequiredDto
+                    {
+                        ParkingAreas = accessibleParkingAreas.Select(p => new ParkingAreaOptionDto
+                        {
+                            ParkingAreaId = p.ParkingAreaId,
+                            Name = p.Name,
+                            Boundary = p.Boundary,
+                            AccessNodeIds = p.AccessNodes.Select(n => n.NodeId).ToList()
+                        }).ToList()
+                    });
+                }
+
+                selectedOriginParkingArea = accessibleParkingAreas
+                    .FirstOrDefault(p => p.ParkingAreaId == originParkingAreaId.Value);
+                if (selectedOriginParkingArea is null)
+                    return BadRequest("The selected origin parking area was not found.");
+
+                // First allow a direct vehicle route from the selected parking area to the destination building.
+                routes = routeService.GetShortestPath(drivingEdges, selectedOriginParkingArea.AccessNodes, toEntrances);
+                if (routes.Any())
+                {
+                    routeOriginParkingAreaId = selectedOriginParkingArea.ParkingAreaId;
+                }
+                else
+                {
+                    var walkingEdges = isGuest
+                        ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, TravelMode.Walking)
+                        : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, TravelMode.Walking);
+                    walkingEdges = walkingEdges
+                        .Where(e => !(e.IsClosed && (e.ClosedUntil == null || e.ClosedUntil > DateTime.UtcNow)))
+                        .ToList();
+
+                    var destinationParkingArea = accessibleParkingAreas
+                        .OrderBy(p => p.Boundary.Distance(toBuilding.Boundary))
+                        .First();
+
+                    routes = routeService.GetParkingOriginPath(
+                        drivingEdges,
+                        walkingEdges,
+                        selectedOriginParkingArea.AccessNodes,
+                        toEntrances,
+                        destinationParkingArea.AccessNodes);
+                    routeOriginParkingAreaId = selectedOriginParkingArea.ParkingAreaId;
+                }
+            }
         }
         else
         {
-            // Direct Walking route
             var navigableEdges = isGuest
                 ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, mode)
                 : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, mode);
@@ -103,6 +155,12 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
             route.ToBuildingId = toBuildingId;
             route.CampusId = campusId;
             route.TravelMode = mode;
+            if (routeOriginParkingAreaId is not null)
+            {
+                route.OriginParkingAreaId = routeOriginParkingAreaId;
+                route.OriginParkingNodeId = route.FromNodeId;
+                route.OriginParkingLocation = new Point(route.Path.Coordinates[0]) { SRID = 4326 };
+            }
             route.SearchCount = 1;
             route.LastRetrieved = DateTime.UtcNow;
 

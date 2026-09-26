@@ -19,6 +19,9 @@ public class Route
     public int? TransitionNodeId { get; set; }
     public int? TransitionParkingAreaId { get; set; }
     public Point? TransitionLocation { get; set; }
+    public int? OriginParkingNodeId { get; set; }
+    public int? OriginParkingAreaId { get; set; }
+    public Point? OriginParkingLocation { get; set; }
     
     public ICollection<RouteGuide> RouteGuides { get; set; } = [];
 }

@@ -5,4 +5,5 @@ export interface Node {
     name: string | null;
     location: GeoPoint;
     buildingId: number | null;
+    parkingAreaId: number | null;
 }

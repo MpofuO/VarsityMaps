@@ -1,4 +1,4 @@
-import { GeoLineString } from './geography';
+import { GeoLineString, GeoPoint } from './geography';
 
 export interface RouteResult {
   routeId: number;
@@ -8,4 +8,8 @@ export interface RouteResult {
   fromBuildingId: number;
   toBuildingId: number;
   travelMode: number;
+  transitionParkingAreaId: number | null;
+  transitionLocation: GeoPoint | null;
+  originParkingAreaId: number | null;
+  originParkingLocation: GeoPoint | null;
 }

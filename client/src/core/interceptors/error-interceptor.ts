@@ -38,6 +38,10 @@ export class ErrorInterceptor implements HttpInterceptor {
       return values.join(' ');
     }
 
+    if (error.error?.message) {
+      return error.error.message;
+    }
+
     return error.message || 'Something went wrong.';
   }
 }

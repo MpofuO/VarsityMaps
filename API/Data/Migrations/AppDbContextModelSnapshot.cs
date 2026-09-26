@@ -388,6 +388,15 @@ namespace API.Data.Migrations
                     b.Property<DateTime>("LastRetrieved")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("OriginParkingAreaId")
+                        .HasColumnType("int");
+
+                    b.Property<Point>("OriginParkingLocation")
+                        .HasColumnType("geometry");
+
+                    b.Property<int?>("OriginParkingNodeId")
+                        .HasColumnType("int");
+
                     b.Property<LineString>("Path")
                         .IsRequired()
                         .HasColumnType("geometry");

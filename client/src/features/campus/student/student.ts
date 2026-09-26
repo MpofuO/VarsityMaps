@@ -6,13 +6,14 @@ import { NavigationService } from '../../../core/services/navigation-service';
 import { ToastService } from '../../../core/services/toast-service';
 import { Building } from '../../../types/building';
 import { CampusMap } from '../../../shared/map/campus-map/campus-map';
-import { MapPolygon, MapPolyline } from '../../../types/map';
+import { MapMarker, MapPolygon, MapPolyline } from '../../../types/map';
 import { RouteResult } from '../../../types/route-result';
 import { DecimalPipe } from '@angular/common';
 import { CampusService } from '../../../core/services/campus-service';
 import { TravelMode } from '../../../types/edge';
 import { LocationCoordinates, LocationTrackingService } from '../../../core/services/location-tracking-service';
 import { RouteGuide } from '../../../types/route-guide';
+import { OriginParkingRequired, ParkingAreaOption } from '../../../types/parking-area';
 
 type PickField = 'origin' | 'destination' | null;
 
@@ -48,6 +49,8 @@ export class Student implements OnInit, OnDestroy {
   protected readonly activePickField = signal<PickField>(null);
   protected readonly originBuildingId = signal<number | null>(null);
   protected readonly destinationBuildingId = signal<number | null>(null);
+  protected readonly originParkingAreaId = signal<number | null>(null);
+  protected readonly originParkingOptions = signal<ParkingAreaOption[]>([]);
 
   protected readonly routes = signal<RouteResult[]>([]);
   protected readonly selectedRouteIndex = signal<number>(0);
@@ -75,6 +78,10 @@ export class Student implements OnInit, OnDestroy {
     return list[index] ?? null;
   });
 
+  protected readonly currentGuide = computed(() =>
+    this.routeGuides()[this.activeGuideIndex()] ?? null
+  );
+
   protected readonly filteredBuildings = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     if (!query) return this.buildings();
@@ -95,16 +102,23 @@ export class Student implements OnInit, OnDestroy {
     this.buildings().find((b) => b.buildingId === this.destinationBuildingId()) ?? null
   );
 
-  protected readonly mapPolygons = computed<MapPolygon[]>(() =>
-    this.buildings().map((b) => ({
-      id: b.buildingId,
+  protected readonly mapPolygons = computed<MapPolygon[]>(() => [
+    ...this.buildings().map((b) => ({
+      id: `building-${b.buildingId}`,
       paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
       selected:
         b.buildingId === this.selectedBuildingId() ||
         b.buildingId === this.originBuildingId() ||
         b.buildingId === this.destinationBuildingId()
+    })),
+    ...this.originParkingOptions().map((parkingArea) => ({
+      id: `origin-parking-${parkingArea.parkingAreaId}`,
+      paths: parkingArea.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
+      selected: parkingArea.parkingAreaId === this.originParkingAreaId(),
+      strokeColor: '#f59e0b',
+      fillColor: '#fbbf24'
     }))
-  );
+  ]);
 
   protected readonly routePolylines = computed<MapPolyline[]>(() => {
     const active = this.activeRoute();
@@ -122,6 +136,38 @@ export class Student implements OnInit, OnDestroy {
       color: index === this.selectedRouteIndex() ? '#22c55e' : '#a855f7',
       selected: index === this.selectedRouteIndex()
     })) as MapPolyline[];
+  });
+
+  protected readonly routeMarkers = computed<MapMarker[]>(() => {
+    const route = this.activeRoute();
+    if (!route) return [];
+
+    const markers: MapMarker[] = [];
+    if (route.originParkingLocation) {
+      markers.push({
+        id: route.routeId * -1 || -1,
+        position: {
+          lat: route.originParkingLocation.coordinates[1],
+          lng: route.originParkingLocation.coordinates[0]
+        },
+        color: '#0ea5e9',
+        selected: this.isNavigating()
+      });
+    }
+
+    if (route.transitionLocation) {
+      markers.push({
+        id: route.routeId * -2 || -2,
+        position: {
+          lat: route.transitionLocation.coordinates[1],
+          lng: route.transitionLocation.coordinates[0]
+        },
+        color: '#f59e0b',
+        selected: this.isNavigating()
+      });
+    }
+
+    return markers;
   });
 
   constructor() {
@@ -151,6 +197,8 @@ export class Student implements OnInit, OnDestroy {
     if (!this.isNavigating()) {
       this.routes.set([]);
       this.selectedRouteIndex.set(0);
+      this.originParkingAreaId.set(null);
+      this.originParkingOptions.set([]);
     }
   });
 }
@@ -206,8 +254,11 @@ export class Student implements OnInit, OnDestroy {
     this.map = map;
   }
 
-  selectBuilding(buildingId: number): void {
+  selectBuilding(key: string): void {
     if (this.isNavigating()) return;
+
+    const buildingId = Number(key.replace('building-', ''));
+    if (!Number.isInteger(buildingId)) return;
 
     const field = this.activePickField();
 
@@ -317,6 +368,8 @@ export class Student implements OnInit, OnDestroy {
     }
 
     this.originBuildingId.set(null);
+    this.originParkingAreaId.set(null);
+    this.originParkingOptions.set([]);
     this.activePickField.set('origin');
   }
 
@@ -325,6 +378,8 @@ export class Student implements OnInit, OnDestroy {
     this.activePickField.set(null);
     this.originBuildingId.set(null);
     this.destinationBuildingId.set(null);
+    this.originParkingAreaId.set(null);
+    this.originParkingOptions.set([]);
     this.routes.set([]);
   }
 
@@ -338,18 +393,29 @@ export class Student implements OnInit, OnDestroy {
     if (from === null || to === null) return;
 
     this.isCalculatingRoute.set(true);
-    this.navigationService.getRoute(from, to, this.selectedTravelMode()).subscribe({
+    this.navigationService.getRoute(from, to, this.selectedTravelMode(), this.originParkingAreaId()).subscribe({
       next: (routes: any) => {
         this.isCalculatingRoute.set(false);
         const routeList = Array.isArray(routes) ? routes : [routes];
         this.routes.set(routeList);
         this.selectedRouteIndex.set(0);
       },
-      error: () => {
+      error: (error) => {
         this.isCalculatingRoute.set(false);
+        const fallback = error.error as OriginParkingRequired | undefined;
+        if (error.status === 409 && fallback?.code === 'ORIGIN_PARKING_REQUIRED') {
+          this.originParkingOptions.set(fallback.parkingAreas);
+          return;
+        }
         this.toastService.error('No route could be found between these buildings.');
       }
     });
+  }
+
+  selectOriginParkingArea(parkingAreaId: number): void {
+    this.originParkingAreaId.set(parkingAreaId);
+    const parkingArea = this.originParkingOptions().find((area) => area.parkingAreaId === parkingAreaId);
+    if (parkingArea) this.centerMapOnBoundsIfNeeded(parkingArea.boundary.coordinates[0], true);
   }
 
   startNavigation(useMock: boolean = true): void {

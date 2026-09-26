@@ -11,12 +11,12 @@ public class RouteRepository : BaseRepository<Route>, IRouteRepository
     {
     }
 
-    public async Task<List<Route>> GetByBuildingsWithGuidesAsync(int fromBuildingId, int toBuildingId, TravelMode mode)
+    public async Task<List<Route>> GetByBuildingsWithGuidesAsync(int fromBuildingId, int toBuildingId, TravelMode mode, int? originParkingAreaId)
     {
         return await context.Routes
             .Include(r => r.RouteGuides.OrderBy(g => g.StepIndex))
             .Where(r => r.FromBuildingId == fromBuildingId && r.ToBuildingId == toBuildingId
-                     && r.TravelMode == mode)
+                     && r.TravelMode == mode && r.OriginParkingAreaId == originParkingAreaId)
             .OrderBy(r => r.Weight)
             .ToListAsync();
     }

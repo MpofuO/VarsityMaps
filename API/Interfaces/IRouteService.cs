@@ -12,6 +12,9 @@ public interface IRouteService
         IReadOnlyList<Edge> drivingEdges, IReadOnlyList<Edge> walkingEdges,
         IEnumerable<Node> originEntrances, IEnumerable<Node> destinationEntrances, 
         IEnumerable<Node> parkingAccessNodes);
+    List<Route> GetParkingOriginPath(IReadOnlyList<Edge> drivingEdges, IReadOnlyList<Edge> walkingEdges,
+        IEnumerable<Node> originParkingNodes, IEnumerable<Node> destinationEntrances,
+        IEnumerable<Node> parkingAccessNodes);
     
     List<RouteGuideDto> GetRouteGuides(Route route, string? parkingAreaName = null);
 }
