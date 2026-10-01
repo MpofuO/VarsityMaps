@@ -493,6 +493,29 @@ namespace API.Data.Migrations
                     b.ToTable("University", (string)null);
                 });
 
+            modelBuilder.Entity("API.Entities.UniversityLookup", b =>
+                {
+                    b.Property<int>("UniversityLookupId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UniversityLookupId"));
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("UniversityLookupId");
+
+                    b.ToTable("UniversityLookup", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")

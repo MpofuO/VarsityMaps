@@ -3,6 +3,7 @@ namespace API.Interfaces;
 public interface IUnitOfWork
 {
     IUniversityRepository UniversityRepository { get; }
+    IUniversityLookupRepository UniversityLookupRepository { get; }
     ICampusRepository CampusRepository { get; }
     IBuildingRepository BuildingRepository { get; }
     IParkingAreaRepository ParkingAreaRepository { get; }

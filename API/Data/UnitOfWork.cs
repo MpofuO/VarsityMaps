@@ -12,6 +12,7 @@ public class UnitOfWork : IUnitOfWork
     {
         _context = context;
         UniversityRepository = new UniversityRepository(_context);
+        UniversityLookupRepository = new UniversityLookupRepository(_context);
         CampusRepository = new CampusRepository(_context);
         BuildingRepository = new BuildingRepository(_context);
         ParkingAreaRepository = new ParkingAreaRepository(_context);
@@ -24,6 +25,7 @@ public class UnitOfWork : IUnitOfWork
     }
 
     public IUniversityRepository UniversityRepository { get; }
+    public IUniversityLookupRepository UniversityLookupRepository { get; }
     public ICampusRepository CampusRepository { get; }
     public IBuildingRepository BuildingRepository { get; }
     public IParkingAreaRepository ParkingAreaRepository { get; }

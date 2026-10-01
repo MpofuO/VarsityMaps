@@ -1,7 +1,8 @@
-import { Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, effect, inject, input, output, signal } from '@angular/core';
 import { Modal } from '../../modal/modal';
 import { defaultMapOptions, loadGoogleMaps } from '../../../core/functions/load-google-maps';
-import { SA_UNIVERSITIES, UniversityLookup } from '../../../core/data/universities';
+import { UniversityLookupService } from '../../../core/services/university-lookup-service';
+import { UniversityLookup } from '../../../types/university-lookup';
 
 const SOUTH_AFRICA_CENTER = { lat: -28.4793, lng: 24.6727 };
 const DEFAULT_ZOOM = 5;
@@ -14,7 +15,8 @@ const SELECTED_ZOOM = 16;
   templateUrl: './coordinate-picker.html',
   styleUrl: './coordinate-picker.css'
 })
-export class CoordinatePicker {
+export class CoordinatePicker implements OnInit {
+  private readonly universityLookupService = inject(UniversityLookupService);
   public isOpen = input(false);
   public initialLatitude = input<number | null>(null);
   public initialLongitude = input<number | null>(null);
@@ -26,14 +28,22 @@ export class CoordinatePicker {
 
   protected readonly selected = signal<{ lat: number; lng: number } | null>(null);
   protected readonly searchQuery = signal('');
+  protected readonly lookups = signal<UniversityLookup[]>([]);
   protected readonly searchResults = computed(() => {
     const q = this.searchQuery().trim().toLowerCase();
     if (q.length < 2) return [];
-    return SA_UNIVERSITIES.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 6);
+    return this.lookups().filter((lookup) => lookup.name.toLowerCase().includes(q)).slice(0, 6);
   });
 
   private map?: google.maps.Map;
   private marker?: google.maps.Marker;
+
+  ngOnInit(): void {
+    this.universityLookupService.getAll().subscribe({
+      next: (lookups) => this.lookups.set(lookups),
+      error: () => this.lookups.set([])
+    });
+  }
 
   constructor() {
     effect(() => {
@@ -110,10 +120,10 @@ export class CoordinatePicker {
     this.selected.set({ lat: position.lat(), lng: position.lng() });
   }
 
-  selectSearchResult(university: UniversityLookup): void {
-    this.searchQuery.set(university.name);
+  selectSearchResult(lookup: UniversityLookup): void {
+    this.searchQuery.set(lookup.name);
     if (this.map) {
-      this.map.panTo({ lat: university.lat, lng: university.lng });
+      this.map.panTo({ lat: lookup.latitude, lng: lookup.longitude });
       this.map.setZoom(SELECTED_ZOOM);
     }
   }

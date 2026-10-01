@@ -8,6 +8,7 @@ namespace API.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<AppUser>(options)
 {
     public DbSet<University> Universities { get; set; }
+    public DbSet<UniversityLookup> UniversityLookups { get; set; }
     public DbSet<Campus> Campuses { get; set; }
     public DbSet<Building> Buildings { get; set; }
     public DbSet<ParkingArea> ParkingAreas { get; set; }
@@ -25,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         builder.Entity<AppUser>().HasQueryFilter(x => !x.IsDeleted);
 
         builder.Entity<University>().ToTable("University");
+        builder.Entity<UniversityLookup>().ToTable("UniversityLookup");
         builder.Entity<Campus>().ToTable("Campus");
         builder.Entity<Building>().ToTable("Building");
         builder.Entity<ParkingArea>().ToTable("ParkingArea");

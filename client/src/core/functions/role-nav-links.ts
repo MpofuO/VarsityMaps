@@ -8,7 +8,8 @@ export interface NavLink {
 const RoleNavLinks: Record<string, NavLink[]> = {
     [SystemAdminRole]: [
         { label: 'Universities', path: '/system-admin/universities' },
-        { label: 'Applications', path: '/system-admin/applications' }
+        { label: 'Applications', path: '/system-admin/applications' },
+        { label: 'Location lookups', path: '/system-admin/university-lookups' }
     ],
     [UniversityAdminRole]: [
         { label: 'Campuses', path: '/university-admin/campuses' },

@@ -12,6 +12,7 @@ import { CampusAdmin } from '../features/campus/admin/campus-admin/campus-admin'
 import { Student } from '../features/campus/student/student';
 import { Universities } from '../features/system-admin/universities/universities';
 import { Applications } from '../features/system-admin/applications/applications';
+import { UniversityLookups } from '../features/system-admin/university-lookups/university-lookups';
 import { Campuses } from '../features/university-admin/campuses/campuses';
 import { Invitations } from '../features/university-admin/invitations/invitations';
 import { unsavedChangesGuard } from '../core/guards/unsaved-changes-guard';
@@ -28,7 +29,8 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'universities', pathMatch: 'full' },
       { path: 'universities', component: Universities },
-      { path: 'applications', component: Applications }
+      { path: 'applications', component: Applications },
+      { path: 'university-lookups', component: UniversityLookups }
     ]
   },
   {

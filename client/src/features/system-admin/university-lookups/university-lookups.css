@@ -1,0 +1,6 @@
+@media (max-width: 640px) {
+  .modal-box {
+    width: calc(100vw - 1rem);
+    max-width: none;
+  }
+}
