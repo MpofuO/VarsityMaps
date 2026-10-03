@@ -19,7 +19,12 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
         var (campusId, isGuest) = await User.GetCampusIdAsync(userManager);
         var parkingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
 
-        if (isGuest) parkingAreas = parkingAreas.Where(p => p.IsGuestAccessible);
+        if (User.IsInRole("StandardUser"))
+        {
+            parkingAreas = parkingAreas.Where(p => p.IsAccessible);
+            if (isGuest)
+                parkingAreas = parkingAreas.Where(p => p.IsGuestAccessible);
+        }
 
         return Ok(parkingAreas.Select(p => p.ToDto()));
     }
@@ -52,6 +57,13 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
         if (parkingAreaDto.Boundary.IsEmpty || !parkingAreaDto.Boundary.IsValid)
             return BadRequest("A valid parking area outline is required.");
 
+        var existingBuildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
+        var existingParkingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
+        if (existingBuildings.Any(b => b.Boundary.Intersects(parkingAreaDto.Boundary)) ||
+            existingParkingAreas.Any(p => p.Boundary.Intersects(parkingAreaDto.Boundary)))
+            return BadRequest("This parking area's outline overlaps an existing building or parking area.");
+        
+        
         var parkingArea = new ParkingArea
         {
             Name = parkingAreaDto.Name.Trim(),

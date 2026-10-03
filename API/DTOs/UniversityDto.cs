@@ -6,4 +6,5 @@ public class UniversityDto
     public string Name { get; set; } = string.Empty;
     public string Alias { get; set; } = string.Empty;
     public int CampusCount { get; set; } = 0;
+    public string? AdminEmail { get; set; }
 }

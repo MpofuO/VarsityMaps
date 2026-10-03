@@ -20,8 +20,13 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         var (campusId, isGuest) = await User.GetCampusIdAsync(userManager);
         var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
 
-        if (isGuest) buildings = buildings.Where(b => b.IsGuestAccessible);
-
+        if (User.IsInRole("StandardUser"))
+        {
+            buildings = buildings.Where(b => b.IsAccessible);
+            if (isGuest)
+                buildings = buildings.Where(b => b.IsGuestAccessible);
+        }
+        
         return Ok(buildings.Select(b => b.ToDto()));
     }
 
@@ -53,8 +58,10 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         if (existingBuilding is not null) return BadRequest("A building with this alias already exists.");
 
         var existingBuildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
-        if (existingBuildings.Any(b => b.Boundary.Intersects(buildingDto.Boundary)))
-            return BadRequest("This building's outline overlaps an existing building.");
+        var existingParkingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
+        if (existingBuildings.Any(b => b.Boundary.Intersects(buildingDto.Boundary)) ||
+            existingParkingAreas.Any(p => p.Boundary.Intersects(buildingDto.Boundary)))
+            return BadRequest("This building's outline overlaps an existing building or parking area.");
 
         var building = new Building
         {

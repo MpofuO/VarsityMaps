@@ -1,6 +1,7 @@
 export interface MapPolygon {
   id: string;
   paths: google.maps.LatLngLiteral[];
+  label?: string;
   selected?: boolean;
   clickable?: boolean;
   strokeColor?: string;

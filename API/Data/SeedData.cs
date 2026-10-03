@@ -23,26 +23,25 @@ public static class SeedData
             if (!await roleManager.RoleExistsAsync(role))
                 await roleManager.CreateAsync(new IdentityRole(role));
         }
-
         var ufs = await GetOrCreateUniversityAsync(context, "University of the Free State", "UFS");
         var ufsCampuses = await GetOrCreateCampusesAsync(context, ufs, new[]
         {
-            ("Bloemfontein Campus", "BFN", 26.1929, -29.1084),
-            ("Qwaqwa Campus", "QWA", 28.7906, -28.5106),
-            ("South Campus", "SC", 26.2145, -29.1204)
+            ("Bloemfontein Campus", "BFN", 26.186551964831427, -29.110679111224844),
+            ("Qwaqwa Campus", "QWA", 28.824826842929767, -28.485617112378254),
+            ("South Campus", "SC", 26.215961433775213, -29.1829977986486), 
         });
 
         var uct = await GetOrCreateUniversityAsync(context, "University of Cape Town", "UCT");
         var uctCampuses = await GetOrCreateCampusesAsync(context, uct, new[]
         {
             ("Upper Campus", "UPP", 18.4612, -33.9578),
-            ("Hiddingh Campus", "HID", 18.4172, -33.9249)
+            ("Hiddingh Campus", "HID", 18.4172, -33.9249),
         });
 
         var ru = await GetOrCreateUniversityAsync(context, "Rhodes University", "RU");
         var ruCampuses = await GetOrCreateCampusesAsync(context, ru, new[]
         {
-            ("Grahamstown Campus", "GTN", 26.5225, -33.3110)
+            ("Grahamstown Campus", "GTN", 26.52072490284499, -33.313311480526714) 
         });
 
         await SeedUserAsync(userManager, "sysadmin@vmaps.com", "Pass@123",

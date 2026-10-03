@@ -6,7 +6,7 @@ import { UniversityLookup } from '../../../types/university-lookup';
 
 const SOUTH_AFRICA_CENTER = { lat: -28.4793, lng: 24.6727 };
 const DEFAULT_ZOOM = 5;
-const SELECTED_ZOOM = 16;
+const SELECTED_ZOOM = 18;
 
 @Component({
   selector: 'app-coordinate-picker',
@@ -121,7 +121,7 @@ export class CoordinatePicker implements OnInit {
   }
 
   selectSearchResult(lookup: UniversityLookup): void {
-    this.searchQuery.set(lookup.name);
+    this.searchQuery.set('');
     if (this.map) {
       this.map.panTo({ lat: lookup.latitude, lng: lookup.longitude });
       this.map.setZoom(SELECTED_ZOOM);

@@ -15,6 +15,7 @@ export class TextInput implements ControlValueAccessor {
   name = input<string>('');
   min = input<number | string | null>(null);
   max = input<number | string | null>(null);
+  maxLength = input<number | null>(null);
   step = input<number | string | null>(null);
   containerClass = input<string>('form-control w-full');
   inputClass = input<string>('input input-bordered w-full text-sm focus:input-primary transition-all');

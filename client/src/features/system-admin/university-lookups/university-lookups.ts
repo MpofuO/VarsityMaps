@@ -1,13 +1,16 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ToastService } from '../../../core/services/toast-service';
 import { UniversityLookupService } from '../../../core/services/university-lookup-service';
 import { UniversityLookup, UniversityLookupInput } from '../../../types/university-lookup';
 import { CoordinatePicker } from '../../../shared/map/coordinate-picker/coordinate-picker';
+import { Modal } from '../../../shared/modal/modal';
+import { TextInput } from '../../../shared/text-input/text-input';
 
 @Component({
   selector: 'app-university-lookups',
   standalone: true,
-  imports: [CoordinatePicker],
+  imports: [CoordinatePicker, Modal, ReactiveFormsModule, TextInput],
   templateUrl: './university-lookups.html',
   styleUrl: './university-lookups.css'
 })
@@ -18,8 +21,9 @@ export class UniversityLookups implements OnInit {
   protected readonly lookups = signal<UniversityLookup[] | null>(null);
   protected readonly searchQuery = signal('');
   protected readonly selectedLookup = signal<UniversityLookup | null>(null);
+  protected readonly lookupToDelete = signal<UniversityLookup | null>(null);
   protected readonly isEditorOpen = signal(false);
-  protected readonly name = signal('');
+  protected readonly name = new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(160)] });
   protected readonly latitude = signal<number | null>(null);
   protected readonly longitude = signal<number | null>(null);
   protected readonly isPickerOpen = signal(false);
@@ -44,7 +48,7 @@ export class UniversityLookups implements OnInit {
 
   openCreate(): void {
     this.selectedLookup.set(null);
-    this.name.set('');
+    this.name.reset('');
     this.latitude.set(null);
     this.longitude.set(null);
     this.isEditorOpen.set(true);
@@ -52,7 +56,7 @@ export class UniversityLookups implements OnInit {
 
   openEdit(lookup: UniversityLookup): void {
     this.selectedLookup.set(lookup);
-    this.name.set(lookup.name);
+    this.name.reset(lookup.name);
     this.latitude.set(lookup.latitude);
     this.longitude.set(lookup.longitude);
     this.isEditorOpen.set(true);
@@ -70,7 +74,7 @@ export class UniversityLookups implements OnInit {
   }
 
   save(): void {
-    const name = this.name().trim();
+    const name = this.name.value.trim();
     const latitude = this.latitude();
     const longitude = this.longitude();
     if (!name || latitude === null || longitude === null) return;
@@ -96,8 +100,17 @@ export class UniversityLookups implements OnInit {
     });
   }
 
-  delete(lookup: UniversityLookup): void {
-    if (!window.confirm(`Delete the lookup for "${lookup.name}"?`)) return;
+  requestDelete(lookup: UniversityLookup): void {
+    this.lookupToDelete.set(lookup);
+  }
+
+  closeDeleteConfirmation(): void {
+    this.lookupToDelete.set(null);
+  }
+
+  confirmDelete(): void {
+    const lookup = this.lookupToDelete();
+    if (!lookup) return;
 
     this.lookupService.delete(lookup.universityLookupId).subscribe({
       next: () => {
@@ -105,6 +118,7 @@ export class UniversityLookups implements OnInit {
           (items ?? []).filter((item) => item.universityLookupId !== lookup.universityLookupId)
         );
         this.toastService.success('Location lookup deleted.');
+        this.closeDeleteConfirmation();
       }
     });
   }

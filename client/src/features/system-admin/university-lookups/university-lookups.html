@@ -1,4 +1,4 @@
-<section class="container mx-auto max-w-6xl px-4 py-8">
+<section class="mx-auto max-w-6xl px-4 py-8">
   <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
     <div>
       <h1 class="text-2xl font-bold">Location lookups</h1>
@@ -39,7 +39,7 @@
               <td class="text-right">
                 <div class="flex justify-end gap-2">
                   <button class="btn btn-sm btn-outline" type="button" (click)="openEdit(lookup)">Edit</button>
-                  <button class="btn btn-sm btn-ghost text-error" type="button" (click)="delete(lookup)" aria-label="Delete lookup">
+                  <button class="btn btn-sm btn-ghost text-error" type="button" (click)="requestDelete(lookup)" aria-label="Delete lookup">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3" />
                     </svg>
@@ -56,18 +56,11 @@
   </div>
 </section>
 
-@if (isEditorOpen()) {
-  <div class="modal modal-open" role="dialog" aria-modal="true" aria-labelledby="lookup-editor-title">
-    <div class="modal-box max-w-lg">
-      <h2 id="lookup-editor-title" class="text-lg font-semibold">
-        {{ selectedLookup() ? 'Edit location lookup' : 'Add location lookup' }}
-      </h2>
-
-      <label class="form-control mt-5 w-full">
-        <span class="label-text mb-1 text-sm">Place name</span>
-        <input class="input input-bordered w-full" maxlength="160" [value]="name()"
-          (input)="name.set($any($event.target).value)" placeholder="University or campus name" />
-      </label>
+<app-modal [isOpen]="isEditorOpen()"
+  [title]="selectedLookup() ? 'Edit location lookup' : 'Add location lookup'" (closed)="closeEditor()">
+  <form class="space-y-4" (ngSubmit)="save()">
+    <app-text-input label="Place name" placeholder="University or campus name" [formControl]="name" [maxLength]="160"
+      [hasIcon]="false" [errorMessages]="{ required: 'Place name is required.', maxlength: 'Place name must be at most 160 characters.' }" />
 
       <div class="mt-4 rounded-box border border-base-300 bg-base-200/50 p-4">
         <div class="grid grid-cols-2 gap-3">
@@ -87,16 +80,28 @@
 
       <div class="modal-action">
         <button class="btn btn-ghost" type="button" (click)="closeEditor()">Cancel</button>
-        <button class="btn btn-primary" type="button"
-          [disabled]="!name().trim() || latitude() === null || longitude() === null || isSaving()" (click)="save()">
+        <button class="btn btn-primary" type="submit"
+          [disabled]="name.invalid || !name.value.trim() || latitude() === null || longitude() === null || isSaving()">
           @if (isSaving()) { <span class="loading loading-spinner loading-xs"></span> }
           Save lookup
         </button>
       </div>
+  </form>
+</app-modal>
+
+<app-modal [isOpen]="lookupToDelete() !== null" title="Delete location lookup" (closed)="closeDeleteConfirmation()">
+  @if (lookupToDelete(); as lookup) {
+    <div class="space-y-4 pt-2">
+      <p class="text-sm">
+        Are you sure you want to delete <span class="font-semibold">{{ lookup.name }}</span>?
+      </p>
+      <div class="modal-action">
+        <button class="btn btn-ghost btn-sm" type="button" (click)="closeDeleteConfirmation()">Cancel</button>
+        <button class="btn btn-error btn-sm text-white" type="button" (click)="confirmDelete()">Delete</button>
+      </div>
     </div>
-    <button class="modal-backdrop" type="button" aria-label="Close lookup editor" (click)="closeEditor()"></button>
-  </div>
-}
+  }
+</app-modal>
 
 <app-coordinate-picker [isOpen]="isPickerOpen()" [initialLatitude]="latitude()" [initialLongitude]="longitude()"
   (picked)="onLocationPicked($event)" (closed)="isPickerOpen.set(false)" />

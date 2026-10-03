@@ -51,8 +51,14 @@ export class SelectInput implements ControlValueAccessor {
 
   onChangeHandler(event: Event): void {
     const select = event.target as HTMLSelectElement;
-    this.value = select.value;
+    const selectedValue = select.value;
+    const selectedOption = this.options().find(option => String(option.value) === selectedValue);
+    this.value = selectedOption?.value ?? selectedValue;
     this.onChange(this.value);
+  }
+
+  isSelected(option: SelectOption): boolean {
+    return String(option.value) === String(this.value);
   }
 
   onBlur(): void {

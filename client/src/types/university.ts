@@ -3,4 +3,5 @@ export interface University {
   name: string;
   alias: string;
   campusCount?: Number;
+  adminEmail?: string;
 }

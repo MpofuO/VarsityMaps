@@ -28,6 +28,7 @@ public static class DtoExtensions
             InviteeName = invitation.InviteeName,
             Duration = invitation.Duration,
             DateCreated = invitation.DateCreated.ToString(),
+            IsAccepted = invitation.IsAccepted,
             IsExpired = invitation.DateCreated.AddDays(invitation.Duration) < DateTime.UtcNow,
             IsLocked = invitation.FailedPassAttempts >= 3,
             IsRevoked = invitation.IsRevoked,

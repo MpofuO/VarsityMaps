@@ -12,10 +12,10 @@ export function loadGoogleMaps(): Promise<typeof google> {
   return loadPromise;
 }
 
-export function defaultMapOptions(): Pick<google.maps.MapOptions, 'mapTypeId' | 'mapTypeControl' | 'mapTypeControlOptions'> {
+export function defaultMapOptions(isStudent = false): Pick<google.maps.MapOptions, 'mapTypeId' | 'mapTypeControl' | 'mapTypeControlOptions'> {
   return {
-    mapTypeId: google.maps.MapTypeId.HYBRID,
-    mapTypeControl: true,
+    mapTypeId: google.maps.MapTypeId.SATELLITE,
+    mapTypeControl: !isStudent,
     mapTypeControlOptions: {
       mapTypeIds: [google.maps.MapTypeId.HYBRID, google.maps.MapTypeId.SATELLITE]
     }

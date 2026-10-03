@@ -118,7 +118,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         {
             var segment = new LineString(new[] { points[i].Coordinate, points[i + 1].Coordinate });
             if (buildings.Any(b => !b.AllowsPassage && b.Boundary.Intersects(segment)))
-                return BadRequest("A path segment crosses a building - adjust the route.");
+                return BadRequest("A path segment crosses a building where path passage is not allowed - try again.");
         }
 
         var resolvedNodes = new List<Node>();

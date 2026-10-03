@@ -19,7 +19,21 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<IEnumerable<UniversityDto>>> GetUniversities()
     {
         var universities = await uow.UniversityRepository.GetAllWithCampuses();
-        return Ok(universities.OrderBy(u => u.Name).Select(u => u.ToDto()));
+        var admins = await userManager.GetUsersInRoleAsync("UniversityAdmin");
+        var adminEmails = admins
+            .Where(admin => admin.IsActive && !admin.IsDeleted && !string.IsNullOrWhiteSpace(admin.Email))
+            .GroupBy(admin => admin.UniversityId)
+            .ToDictionary(group => group.Key, group => group.First().Email);
+
+        var universityDtos = universities.OrderBy(u => u.Name).Select(university =>
+        {
+            var dto = university.ToDto();
+            adminEmails.TryGetValue(university.UniversityId, out var adminEmail);
+            dto.AdminEmail = adminEmail;
+            return dto;
+        });
+
+        return Ok(universityDtos);
     }
 
     [HttpGet("{universityId:int}/campuses")]

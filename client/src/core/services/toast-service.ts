@@ -10,7 +10,7 @@ export class ToastService {
     if (!document.getElementById('toast-container')) {
       const container = document.createElement('div');
       container.id = 'toast-container';
-      container.className = 'fixed right-4 bottom-4 flex flex-col gap-3 z-50';
+      container.className = 'fixed right-4 bottom-4 flex flex-col gap-3 z-[10000]';
       document.body.appendChild(container);
     }
   }

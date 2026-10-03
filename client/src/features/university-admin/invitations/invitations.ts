@@ -146,7 +146,7 @@ export class Invitations implements OnInit {
   }
 
   openCreate(): void {
-    this.createForm.reset({ inviteeName: '', inviteeEmail: '', campusId: null, duration: 7 });
+    this.createForm.reset();
     this.isCreateOpen.set(true);
   }
 

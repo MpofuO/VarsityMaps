@@ -22,7 +22,7 @@ import { CampusNode } from '../campus-node/campus-node';
 import { CampusPaths } from '../campus-path/campus-path';
 import { isPointInPolygon, toGeoPolygon } from '../../../../core/functions/geography';
 import { CanComponentDeactivate } from '../../../../core/guards/unsaved-changes-guard';
-import { Observable, Subject, take } from 'rxjs';
+import { finalize, Observable, Subject, take } from 'rxjs';
 // #endregion
 
 type EditorMode = 'view' | 'draw-building'
@@ -82,8 +82,10 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly isLeaveConfirmOpen = signal(false);
   private leaveConfirmSubject: Subject<boolean> | null = null;
   hasUnsavedWork = computed(() => {
-    return this.mode() === 'draw-building' || this.mode() === 'draw-parking-area' ||
-      this.mode() === 'place-nodes' || this.mode() === 'place-parking-access' || this.mode() === 'connect-nodes';
+    const mode = this.mode();
+    const isSelectingEdges = mode === 'select-edges' || mode === 'select-path-range';
+    return mode !== 'view' && mode !== 'place-entrance'
+      && (!isSelectingEdges || this.selectedEdgeIds().size > 0);
   });
 
   canDeactivate(): boolean | Observable<boolean> {
@@ -172,6 +174,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     ...this.buildings().map((b) => ({
       id: `building-${b.buildingId}`,
       paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
+      label: b.alias,
       selected: b.buildingId === this.selectedBuildingId(),
       clickable: this.mode() !== 'place-nodes' || !b.allowsPassage,
       strokeColor: '#7c3aed',
@@ -243,14 +246,14 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   // #region Lifecycle
   ngOnInit(): void {
-    this.load();
-  }
-
-  private load(): void {
     const userCampusId = this.accountService.currentUser()?.campusId;
     if (userCampusId) {
       this.campusService.getCampus(userCampusId).subscribe({ next: (c) => this.campus.set(c) });
     }
+    this.load();
+  }
+
+  private load(): void {
     this.buildingService.getBuildings().subscribe({ next: (b) => this.buildings.set(b) });
     this.parkingAreaService.getParkingAreas().subscribe({ next: (p) => this.parkingAreas.set(p) });
     this.nodeService.getNodes().subscribe({ next: (n) => this.nodes.set(n) });
@@ -513,10 +516,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   handleCreateBuilding(modelData: Omit<BuildingModel, 'boundary'>): void {
     const model: BuildingModel = { ...modelData, boundary: toGeoPolygon(this.draftPath()) };
-    this.buildingService.createBuilding(model).subscribe({
+    this.buildingService.createBuilding(model).pipe(
+      finalize(() => this.cancelMode())
+    ).subscribe({
       next: () => {
         this.toastService.success('Building added.');
-        this.cancelMode();
         this.load();
       }
     });
@@ -546,10 +550,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   handleCreateParkingArea(modelData: Omit<ParkingAreaModel, 'boundary'>): void {
     const model: ParkingAreaModel = { ...modelData, boundary: toGeoPolygon(this.draftPath()) };
-    this.parkingAreaService.addParkingArea(model).subscribe({
+    this.parkingAreaService.addParkingArea(model).pipe(
+      finalize(() => this.cancelMode())
+    ).subscribe({
       next: () => {
         this.toastService.success('Parking area added.');
-        this.cancelMode();
         this.load();
       }
     });
@@ -623,7 +628,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
 
   private isNearFirstVertex(point: google.maps.LatLngLiteral, first: google.maps.LatLngLiteral): boolean {
-    return Math.abs(point.lat - first.lat) < 0.00006 && Math.abs(point.lng - first.lng) < 0.00006;
+    return Math.abs(point.lat - first.lat) < 0.00003 && Math.abs(point.lng - first.lng) < 0.00003;
   }
   // #endregion
 
@@ -646,10 +651,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       location: p.existingNodeId ? null : { type: 'Point', coordinates: [p.point.lng, p.point.lat] }
     }));
 
-    this.nodeService.addNodes(items).subscribe({
+    this.nodeService.addNodes(items).pipe(
+      finalize(() => this.cancelMode())
+    ).subscribe({
       next: () => {
         this.toastService.success('Nodes added.');
-        this.cancelMode();
         this.load();
       }
     });
@@ -877,45 +883,45 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
 
   openBulkEdgeProperties(): void {
-  const ids = Array.from(this.selectedEdgeIds());
-  if (ids.length === 0) return;
+    const ids = Array.from(this.selectedEdgeIds());
+    if (ids.length === 0) return;
 
-  const selectedEdges = this.edges().filter((e) => this.selectedEdgeIds().has(e.edgeId));
+    const selectedEdges = this.edges().filter((e) => this.selectedEdgeIds().has(e.edgeId));
 
-  const allClosed = selectedEdges.length > 0 && selectedEdges.every((e) => e.isClosed || e.isEffectivelyClosed);
-  this.propertiesIsClosed.set(allClosed);
+    const allClosed = selectedEdges.length > 0 && selectedEdges.every((e) => e.isClosed || e.isEffectivelyClosed);
+    this.propertiesIsClosed.set(allClosed);
 
-  const commonModes = new Set<TravelMode>();
+    const commonModes = new Set<TravelMode>();
 
-  if (selectedEdges.length > 0) {
-    const availableModes = [
-      TravelMode.Walking, 
-      TravelMode.Cycling, 
-      TravelMode.Bus, 
-      TravelMode.Car
-    ];
+    if (selectedEdges.length > 0) {
+      const availableModes = [
+        TravelMode.Walking,
+        TravelMode.Cycling,
+        TravelMode.Bus,
+        TravelMode.Car
+      ];
 
-    for (const mode of availableModes) {
-      const isAvailableInAll = selectedEdges.every(
-        (e) => (e.travelModes & mode) === mode
-      );
+      for (const mode of availableModes) {
+        const isAvailableInAll = selectedEdges.every(
+          (e) => (e.travelModes & mode) === mode
+        );
 
-      if (isAvailableInAll) {
-        commonModes.add(mode);
+        if (isAvailableInAll) {
+          commonModes.add(mode);
+        }
       }
     }
-  }
 
-  if (commonModes.size === 0) {
-    commonModes.add(TravelMode.Walking);
-  }
+    if (commonModes.size === 0) {
+      commonModes.add(TravelMode.Walking);
+    }
 
-  this.edgePropertiesTarget.set({ ids });
-  this.propertiesName.set('');
-  this.propertiesClosedUntil.set('');
-  this.propertiesTravelModes.set(commonModes);
-  this.isEdgePropertiesOpen.set(true);
-}
+    this.edgePropertiesTarget.set({ ids });
+    this.propertiesName.set('');
+    this.propertiesClosedUntil.set('');
+    this.propertiesTravelModes.set(commonModes);
+    this.isEdgePropertiesOpen.set(true);
+  }
 
   openBulkDeleteConfirm(): void {
     if (this.selectedEdgeIds().size === 0) return;

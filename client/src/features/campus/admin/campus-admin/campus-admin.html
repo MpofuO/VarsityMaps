@@ -1,5 +1,5 @@
-<section class="container mx-auto px-4 py-4 h-[calc(100vh-4rem)] flex flex-col min-h-0">
-  <div class="flex items-center justify-between mb-3 shrink-0">
+<section class="w-full px-4 py-2 h-[calc(100vh-6.5rem)] flex flex-col min-h-0">
+  <div class="sticky top-16 z-40 -mx-4 px-4 py-2 flex items-center justify-between mb-3 shrink-0 bg-base-100">
     <div>
       <div class="flex items-center gap-2">
         <h1 class="text-xl font-bold">Campus Editor</h1>
@@ -91,7 +91,7 @@
             <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-warning"></span>
           </span>
           <span class="text-xs font-medium text-base-content">
-            {{ draftPath().length }} point(s) placed
+            Click map to place boundary points ({{ draftPath().length }} placed; 3 minimum)
           </span>
         </div>
         <div class="divider divider-horizontal my-0 py-1"></div>
@@ -107,7 +107,7 @@
 
       @if (mode() === 'draw-parking-area') {
       <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
-        <span class="text-xs font-medium">{{ draftPath().length }} point(s) placed</span>
+        <span class="text-xs font-medium">Click map to place boundary points ({{ draftPath().length }} placed; 3 minimum)</span>
         <div class="divider divider-horizontal my-0 py-1"></div>
         <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftPath().length < 3" (click)="finishDrawing()">Finish Shape</button>
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
@@ -117,7 +117,7 @@
       @if (mode() === 'place-nodes') {
       <div
         class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
-        <span class="text-xs font-medium">{{ draftNodePath().length }} point(s) — click an existing node to finish and
+        <span class="text-xs font-medium">{{ draftNodePath().length }} point(s) - you can click an existing node to finish and
           connect</span>
         <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftNodePath().length < 2"
           (click)="finishPlacingNodes()">Finish</button>
@@ -151,6 +151,17 @@
       @if (mode() === 'place-parking-access') {
       <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
         <span class="text-xs font-medium">Click within 5m of {{ parkingAccessTarget()?.name }}'s boundary</span>
+        <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
+      </div>
+      }
+
+      @if (mode() === 'select-path-range') {
+      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
+        @if (rangeStartNodeId() === null) {
+        <span class="text-xs font-medium">Select the starting node</span>
+        } @else {
+        <span class="text-xs font-medium">Select the destination node</span>
+        }
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
       </div>
       }
@@ -271,8 +282,19 @@
     <input class="input input-bordered input-sm w-full" placeholder="Access node name (e.g. Main Entrance)"
       [value]="parkingAccessName()" (input)="parkingAccessName.set($any($event.target).value)" />
     <div class="modal-action">
-      <button type="button" class="btn btn-ghost btn-sm" (click)="isParkingAccessConfirmOpen.set(false)">Cancel</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="cancelMode()">Cancel</button>
       <button type="button" class="btn btn-primary btn-sm" [disabled]="!parkingAccessName().trim()" (click)="confirmParkingAccessNode()">Add access node</button>
+    </div>
+  </div>
+</app-modal>
+
+
+<app-modal [isOpen]="isLeaveConfirmOpen()" title="Unsaved changes" (closed)="cancelLeave()">
+  <div class="space-y-4">
+    <p class="text-sm">You have unsaved work in the campus editor - leave without saving?</p>
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="cancelLeave()">Stay</button>
+      <button type="button" class="btn btn-error btn-sm text-error-content" (click)="confirmLeave()">Leave without saving</button>
     </div>
   </div>
 </app-modal>

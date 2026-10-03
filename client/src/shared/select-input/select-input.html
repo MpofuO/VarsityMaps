@@ -14,11 +14,11 @@
       (change)="onChangeHandler($event)"
       (blur)="onBlur()"
     >
-      <option [value]="value" disabled selected>
+      <option value="" disabled [selected]="value === ''">
         {{ disabled ? disabledPlaceholder() : placeholder() }}
       </option>
       @for (opt of options(); track opt.value) {
-        <option [value]="opt.value">{{ opt.label }}</option>
+        <option [value]="opt.value" [selected]="isSelected(opt)">{{ opt.label }}</option>
       }
     </select>
   </div>

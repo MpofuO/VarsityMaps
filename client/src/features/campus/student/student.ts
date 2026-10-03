@@ -79,6 +79,7 @@ export class Student implements OnInit, OnDestroy {
   private errorSub?: Subscription;
   private deviationSamples = 0;
   private onRouteSamples = 0;
+  private checkInitialDeviation = false;
   private readonly element = inject(ElementRef);
 
   protected readonly activeRoute = computed(() => {
@@ -115,6 +116,7 @@ export class Student implements OnInit, OnDestroy {
     ...this.buildings().map((b) => ({
       id: `building-${b.buildingId}`,
       paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
+      label: b.alias,
       selected:
         b.buildingId === this.selectedBuildingId() ||
         b.buildingId === this.originBuildingId() ||
@@ -495,6 +497,7 @@ export class Student implements OnInit, OnDestroy {
       this.showDeviationPrompt.set(false);
       this.deviationSamples = 0;
       this.onRouteSamples = 0;
+      this.checkInitialDeviation = true;
       this.isNavigating.set(true);
       this.isPlanningRoute.set(false);
       this.locationService.startTracking();
@@ -541,6 +544,7 @@ export class Student implements OnInit, OnDestroy {
         this.showDeviationPrompt.set(false);
         this.deviationSamples = 0;
         this.onRouteSamples = 0;
+        this.checkInitialDeviation = true;
         this.originLocation.set(location);
         this.updateUserMarker(location);
         this.locationService.startTracking();
@@ -580,6 +584,7 @@ export class Student implements OnInit, OnDestroy {
     this.showDeviationPrompt.set(false);
     this.deviationSamples = 0;
     this.onRouteSamples = 0;
+    this.checkInitialDeviation = false;
 
     if (this.userMarker) {
       this.userMarker.setMap(null);
@@ -621,6 +626,8 @@ export class Student implements OnInit, OnDestroy {
     const guides = this.routeGuides();
     if (!active || !active.path.coordinates.length) return;
 
+    const isInitialFix = this.checkInitialDeviation;
+    this.checkInitialDeviation = false;
     const destCoord = active.path.coordinates[active.path.coordinates.length - 1];
     const distanceToDest = this.haversine(loc.latitude, loc.longitude, destCoord[1], destCoord[0]);
 
@@ -639,7 +646,7 @@ export class Student implements OnInit, OnDestroy {
       }
     } else {
       this.deviationSamples = distanceToRoute > deviationThreshold ? this.deviationSamples + 1 : 0;
-      if (this.deviationSamples >= 3) {
+      if (distanceToRoute > deviationThreshold && (isInitialFix || this.deviationSamples >= 3)) {
         this.isOffRoute.set(true);
         this.showDeviationPrompt.set(true);
         this.currentInstruction.set('You are off route. Return to the highlighted path or recalculate.');
