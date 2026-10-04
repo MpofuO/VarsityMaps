@@ -18,6 +18,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up node.js
+        uses: actions/setup-node@v4
+        with: 
+          node-version: '22.x'
+
+      - name: Install Angular cli
+        run: npm install -g @angular/cli@20
+
+      - name: Generate environment.ts and build angular app
+        run: |
+          cd client
+          mkdir src/environments -ErrorAction SilentlyContinue
+          @"
+          export const environment = {
+            production: true,
+            apiUrl: 'api',
+            googleMapsApiKey: '${{ secrets.GOOGLE_MAPS_API_KEY }}'
+          };
+          "@ | Out-File -FilePath src/environments/environment.ts -Encoding utf8
+          npm install
+          ng build
+
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
@@ -62,4 +84,3 @@ jobs:
           app-name: 'varsitymaps'
           slot-name: 'Production'
           package: .
-          

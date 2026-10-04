@@ -20,7 +20,7 @@
       [attr.max]="max()"
       [attr.maxlength]="maxLength()"
       [attr.step]="step()"
-      [value]="type() === 'number' ? 1 : value"
+      [value]="type() === 'number' ? 0 : value"
       [disabled]="disabled"
       (input)="onInput($event)"
       (blur)="onBlur()"

@@ -1,0 +1,49 @@
+@media (max-width: 767.98px) {
+  .app-navbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+
+  .navbar-primary {
+    display: contents;
+  }
+
+  .navbar-brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    min-height: 2.5rem;
+    padding-inline: 0.25rem;
+    font-size: 1.125rem;
+  }
+
+  .nav-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    padding: 0 0.25rem;
+    font-size: 0.7rem;
+  }
+
+  .navbar-busy {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    margin: 0;
+  }
+
+  .navbar-context {
+    display: none;
+  }
+
+  .navbar-actions {
+    grid-column: 2;
+    grid-row: 1;
+    gap: 0.25rem;
+  }
+}

@@ -58,7 +58,7 @@
 
 <app-modal [isOpen]="isEditorOpen()"
   [title]="selectedLookup() ? 'Edit location lookup' : 'Add location lookup'" (closed)="closeEditor()">
-  <form class="space-y-4" (ngSubmit)="save()">
+  <form class="space-y-4">
     <app-text-input label="Place name" placeholder="University or campus name" [formControl]="name" [maxLength]="160"
       [hasIcon]="false" [errorMessages]="{ required: 'Place name is required.', maxlength: 'Place name must be at most 160 characters.' }" />
 
@@ -80,7 +80,7 @@
 
       <div class="modal-action">
         <button class="btn btn-ghost" type="button" (click)="closeEditor()">Cancel</button>
-        <button class="btn btn-primary" type="submit"
+        <button class="btn btn-primary" type="submit" (click)="save()"
           [disabled]="name.invalid || !name.value.trim() || latitude() === null || longitude() === null || isSaving()">
           @if (isSaving()) { <span class="loading loading-spinner loading-xs"></span> }
           Save lookup

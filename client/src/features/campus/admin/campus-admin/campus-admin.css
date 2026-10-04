@@ -1,0 +1,28 @@
+.campus-admin-screen-warning {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  .campus-admin-workspace {
+    display: none;
+  }
+
+  .campus-admin-screen-warning {
+    display: grid;
+    min-height: calc(100vh - 8rem);
+    min-height: calc(100dvh - 8rem);
+    padding: 2rem 1.25rem;
+    place-items: center;
+    text-align: center;
+  }
+
+  .campus-admin-screen-warning__content {
+    max-width: 32rem;
+    padding: 2rem;
+    border: 1px solid var(--color-error);
+    border-radius: 1rem;
+    background: var(--color-base-100);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 8%);
+  }
+
+}

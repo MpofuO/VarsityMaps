@@ -1,4 +1,4 @@
-<section class="mx-auto px-4 py-4 h-[calc(100vh-6.5rem)] flex flex-col min-h-0">
+<section class="student-page mx-auto px-4 py-4 h-[calc(100vh-6.5rem)] flex flex-col min-h-0">
   <div class="flex items-center justify-between mb-3 shrink-0">
     <div>
       <h1 class="text-xl font-bold">{{ campusName() || 'Campus Map' }}</h1>
@@ -10,8 +10,8 @@
     }
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
-    <div class="rounded-box border border-base-300 bg-base-100 p-3 flex flex-col min-h-0 shadow-sm">
+  <div class="student-layout grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
+    <div class="student-controls rounded-box border border-base-300 bg-base-100 p-3 flex flex-col min-h-0 shadow-sm">
 
       <!-- Active Navigation Interface -->
       @if (isNavigating()) {
@@ -280,7 +280,7 @@
       }
     </div>
 
-    <div class="relative w-full h-full min-h-0">
+    <div class="student-map relative w-full h-full min-h-0">
       <app-campus-map
         [polygons]="mapPolygons()"
         [markers]="routeMarkers()"
