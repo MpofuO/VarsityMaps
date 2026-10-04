@@ -15,6 +15,9 @@ namespace API.Controllers;
 [Route("api/[controller]")]
 public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow, ITokenService tokenService) : ControllerBase
 {
+    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(7);
+    private const string RefreshTokenCookieName = "refreshToken";
+
     [HttpPost("login")]
     public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)
     {
@@ -38,6 +41,10 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
 
             return BadRequest("Your account is not active.");
         }
+
+        var refreshResult = await SetRefreshTokenCookie(user);
+        if (!refreshResult.Succeeded)
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Could not create a refresh session.");
 
         return await user.ToDto(tokenService);
     }
@@ -100,6 +107,10 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
             if (isNew) await userManager.DeleteAsync(user);
             return BadRequest(roleResult.Errors);
         }
+
+        var refreshResult = await SetRefreshTokenCookie(user);
+        if (!refreshResult.Succeeded)
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Could not create a refresh session.");
 
         return await user.ToDto(tokenService);
     }
@@ -189,6 +200,38 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
             return BadRequest("Failed to accept invitation.");
         }
 
+        var refreshResult = await SetRefreshTokenCookie(user);
+        if (!refreshResult.Succeeded)
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Could not create a refresh session.");
+
+        return await user.ToDto(tokenService);
+    }
+
+    [HttpPost("refresh-token")]
+    [AllowAnonymous]
+    public async Task<ActionResult<UserDto>> RefreshToken()
+    {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName];
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return NoContent();
+
+        var refreshTokenHash = tokenService.HashRefreshToken(refreshToken);
+        var now = DateTime.UtcNow;
+        var user = await userManager.Users.FirstOrDefaultAsync(x =>
+            x.RefreshTokenHash == refreshTokenHash &&
+            x.RefreshTokenExpiry > now &&
+            x.IsActive);
+
+        if (user is null)
+        {
+            DeleteRefreshTokenCookie();
+            return NoContent();
+        }
+
+        var refreshResult = await SetRefreshTokenCookie(user);
+        if (!refreshResult.Succeeded)
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Could not refresh the session.");
+
         return await user.ToDto(tokenService);
     }
 
@@ -239,10 +282,55 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
     }
 
     [HttpPost("logout")]
-    [Authorize]
+    [AllowAnonymous]
     public async Task<ActionResult> Logout()
     {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName];
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            var refreshTokenHash = tokenService.HashRefreshToken(refreshToken);
+            await userManager.Users
+                .Where(x => x.RefreshTokenHash == refreshTokenHash)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.RefreshTokenHash, _ => (string?)null)
+                    .SetProperty(x => x.RefreshTokenExpiry, _ => (DateTime?)null));
+        }
+
+        DeleteRefreshTokenCookie();
         return Ok();
+    }
+
+    private async Task<IdentityResult> SetRefreshTokenCookie(AppUser user)
+    {
+        var refreshToken = tokenService.GenerateRefreshToken();
+        var expires = DateTime.UtcNow.Add(RefreshTokenLifetime);
+        user.RefreshTokenHash = tokenService.HashRefreshToken(refreshToken);
+        user.RefreshTokenExpiry = expires;
+
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return result;
+
+        Response.Cookies.Append(RefreshTokenCookieName, refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Expires = expires,
+            Path = "/api/account"
+        });
+
+        return result;
+    }
+
+    private void DeleteRefreshTokenCookie()
+    {
+        Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
+        {
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Path = "/api/account"
+        });
     }
 
     private async Task<(AppUser, bool)> GetUserByEmailFromAll(string email)

@@ -19,7 +19,6 @@ export class InvitationService extends BaseService {
   }
 
   createInvitation(model: CreateInvitationModel) {
-    console.log("Model: ", model);
     return this.http.post<Invitation>(`${this.apiUrl}/invitation`, model);
   }
 

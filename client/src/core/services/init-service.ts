@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { catchError, firstValueFrom, map, of } from 'rxjs';
 import { AccountService } from './account-service';
 import { ThemeService } from './theme-service';
 
@@ -9,8 +10,11 @@ export class InitService {
     private readonly themeService: ThemeService
   ) {}
 
-  initialize(): void {
-    this.accountService.currentUser();
+  initialize(): Promise<void> {
     this.themeService.initialize();
+    return firstValueFrom(this.accountService.refreshToken().pipe(
+      map(() => undefined),
+      catchError(() => of(undefined))
+    ));
   }
 }

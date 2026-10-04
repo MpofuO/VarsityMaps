@@ -16,6 +16,8 @@ import { UniversityLookups } from '../features/system-admin/university-lookups/u
 import { Campuses } from '../features/university-admin/campuses/campuses';
 import { Invitations } from '../features/university-admin/invitations/invitations';
 import { unsavedChangesGuard } from '../core/guards/unsaved-changes-guard';
+import { NotFound } from '../features/error-pages/not-found/not-found';
+import { ServerError } from '../features/error-pages/server-error/server-error';
 
 export const routes: Routes = [
   { path: '', component: Landing, canActivate: [publicGuard] },
@@ -52,7 +54,7 @@ export const routes: Routes = [
     path: 'map', component: Student,
     canActivate: [authGuard, roleGuard([StandardUserRole])]
   },
-  { path: 'not-found', redirectTo: '' },
-  { path: 'server-error', redirectTo: '' },
-  { path: '**', redirectTo: '' }
+  { path: 'not-found', component: NotFound },
+  { path: 'server-error', component: ServerError },
+  { path: '**', redirectTo: '/not-found' }
 ];

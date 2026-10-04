@@ -43,7 +43,10 @@ builder.Services.AddIdentityCore<AppUser>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        var tokenKey = builder.Configuration["TokenKey"] ?? "development-token-key-1234567890";
+        var tokenKey = builder.Configuration["TokenKey"] ??
+                       throw new InvalidOperationException("TokenKey must be configured.");
+        if (Encoding.UTF8.GetByteCount(tokenKey) < 64)
+            throw new InvalidOperationException("TokenKey must be at least 64 bytes.");
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -60,13 +63,9 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("RequireCampusAdminRole", policy => policy.RequireRole("CampusAdmin"))
     .AddPolicy("RequireStandardUserRole", policy => policy.RequireRole("StandardUser"))
     .AddPolicy("RequireUniversityAdminOrCampusAdminRole", policy => policy.RequireRole("UniversityAdmin", "CampusAdmin"))
-    .AddPolicy("RequireCampusAdminOrStandardUserRole", policy => policy.RequireRole("CampusAdmin", "StandardUser"));;
+    .AddPolicy("RequireCampusAdminOrStandardUserRole", policy => policy.RequireRole("CampusAdmin", "StandardUser"));
 
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-}
 
 app.UseHttpsRedirection();
 app.UseCors(policy => policy

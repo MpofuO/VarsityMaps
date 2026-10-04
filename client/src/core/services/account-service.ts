@@ -19,6 +19,7 @@ export type Role = typeof SystemAdminRole | typeof UniversityAdminRole | typeof 
 export class AccountService extends BaseService {
   private readonly storageKey = 'varsitymaps-user';
   private readonly recentSearchesKey = 'varsitymaps-recent-searches';
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly currentUser = signal<User | null>(null);
   readonly recentSearches = signal<Building[]>([]);
@@ -29,7 +30,7 @@ export class AccountService extends BaseService {
   }
 
   login(model: LoginModel) {
-    return this.http.post<User>(`${this.apiUrl}/account/login`, model).pipe(
+    return this.http.post<User>(`${this.apiUrl}/account/login`, model, { withCredentials: true }).pipe(
       tap(user => {
         if (user) {
           this.setAuthenticatedUser(user);
@@ -40,7 +41,7 @@ export class AccountService extends BaseService {
   }
 
   registerStandardUser(model: RegisterModel) {
-    return this.http.post<User>(`${this.apiUrl}/account/register`, model).pipe(
+    return this.http.post<User>(`${this.apiUrl}/account/register`, model, { withCredentials: true }).pipe(
       tap((user) => this.setAuthenticatedUser(user)),
       catchError((error: HttpErrorResponse) => throwError(() => error))
     );
@@ -61,7 +62,7 @@ export class AccountService extends BaseService {
   }
 
   acceptInvitation(invitationId: number, model: AcceptInvitationModel) {
-    return this.http.post<User>(`${this.apiUrl}/account/accept-invitation/${invitationId}`, model).pipe(
+    return this.http.post<User>(`${this.apiUrl}/account/accept-invitation/${invitationId}`, model, { withCredentials: true }).pipe(
       tap((user) => this.setAuthenticatedUser(user)),
       catchError((error: HttpErrorResponse) => throwError(() => error))
     );
@@ -85,8 +86,20 @@ export class AccountService extends BaseService {
     return this.http.get<University>(`${this.apiUrl}/account/my-university`);
   }
 
+  refreshToken() {
+    return this.http.post<User | null>(`${this.apiUrl}/account/refresh-token`, {}, { withCredentials: true }).pipe(
+      tap(user => user ? this.setAuthenticatedUser(user) : this.clearUser()),
+      catchError(error => {
+        this.clearUser();
+        return throwError(() => error);
+      })
+    );
+  }
+
   logout(): void {
     this.clearUser();
+    this.http.post<void>(`${this.apiUrl}/account/logout`, {}, { withCredentials: true })
+      .subscribe({ error: () => this.clearUser() });
   }
 
   addRecentSearch(building: Building): void {
@@ -114,6 +127,7 @@ export class AccountService extends BaseService {
 
     this.currentUser.set(authenticatedUser);
     window.localStorage.setItem(this.storageKey, JSON.stringify(authenticatedUser));
+    this.scheduleTokenRefresh(authenticatedUser.token);
 
     this.syncRecentSearchesForCampus(user.campusId);
 
@@ -121,9 +135,30 @@ export class AccountService extends BaseService {
   }
 
   private clearUser(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
     this.currentUser.set(null);
     this.recentSearches.set([]);
     window.localStorage.removeItem(this.storageKey);
+  }
+
+  private scheduleTokenRefresh(token: string): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+
+    const expiresAt = Number(this.decodeTokenPayload(token)?.['exp']) * 1000;
+    if (!Number.isFinite(expiresAt)) {
+      this.clearUser();
+      return;
+    }
+
+    const refreshIn = Math.max(expiresAt - Date.now() - 60_000, 0);
+    this.refreshTimer = setTimeout(() => {
+      this.refreshToken().subscribe({ error: () => this.clearUser() });
+    }, refreshIn);
   }
 
   private loadFromStorage(): void {
@@ -163,12 +198,23 @@ export class AccountService extends BaseService {
     const token = user.token;
     if (!token) return [];
 
+    const model = this.decodeTokenPayload(token);
+    const roles = model?.['role'] ?? model?.['roles'] ?? [];
+    if (Array.isArray(roles)) {
+      return roles.filter((role): role is string => typeof role === 'string');
+    }
+    return typeof roles === 'string' ? [roles] : [];
+  }
+
+  private decodeTokenPayload(token: string): Record<string, unknown> | null {
     try {
-      const model = JSON.parse(atob(token.split('.')[1]));
-      const roles = model.role ?? model.roles ?? [];
-      return Array.isArray(roles) ? roles : [roles];
+      const encodedPayload = token.split('.')[1]
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+      const paddedPayload = encodedPayload.padEnd(Math.ceil(encodedPayload.length / 4) * 4, '=');
+      return JSON.parse(atob(paddedPayload)) as Record<string, unknown>;
     } catch {
-      return [];
+      return null;
     }
   }
 }
