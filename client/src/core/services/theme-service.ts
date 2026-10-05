@@ -12,8 +12,12 @@ export class ThemeService {
   }
 
   toggleTheme(): void {
-    const nextTheme = this.currentTheme() === 'dark' ? 'light' : 'dark';
+    const nextTheme = this.isDarkMode() ? 'light' : 'dark';
     this.setTheme(nextTheme);
+  }
+
+  isDarkMode(): boolean {
+    return this.resolveTheme(this.currentTheme()) === 'dark';
   }
 
   setTheme(theme: 'light' | 'dark' | 'system'): void {
@@ -23,12 +27,14 @@ export class ThemeService {
   }
 
   private applyTheme(theme: 'light' | 'dark' | 'system'): void {
-    const resolvedTheme = theme === 'system'
+    document.documentElement.setAttribute('data-theme', this.resolveTheme(theme));
+  }
+
+  private resolveTheme(theme: 'light' | 'dark' | 'system'): 'light' | 'dark' {
+    return theme === 'system'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light'
       : theme;
-
-    document.documentElement.setAttribute('data-theme', resolvedTheme);
   }
 }

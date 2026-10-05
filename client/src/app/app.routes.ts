@@ -20,19 +20,19 @@ import { NotFound } from '../features/error-pages/not-found/not-found';
 import { ServerError } from '../features/error-pages/server-error/server-error';
 
 export const routes: Routes = [
-  { path: '', component: Landing, canActivate: [publicGuard] },
-  { path: 'login', component: Login, canActivate: [publicGuard] },
-  { path: 'register-standard-user', component: RegisterStandardUser },
-  { path: 'register-institution', component: RegisterInstitution },
-  { path: 'accept-invitation/:id', component: AcceptInvitation, canActivate: [publicGuard] },
+  { path: '', component: Landing, canActivate: [publicGuard], title: 'Home' },
+  { path: 'login', component: Login, canActivate: [publicGuard], title: 'Login' },
+  { path: 'register-standard-user', component: RegisterStandardUser, title: 'Register' },
+  { path: 'register-institution', component: RegisterInstitution, title: 'Register Institution' },
+  { path: 'accept-invitation/:id', component: AcceptInvitation, canActivate: [publicGuard], title: 'Accept Invitation' },
   {
     path: 'system-admin',
     canActivate: [authGuard, roleGuard([SystemAdminRole])],
     children: [
       { path: '', redirectTo: 'universities', pathMatch: 'full' },
-      { path: 'universities', component: Universities },
-      { path: 'applications', component: Applications },
-      { path: 'university-lookups', component: UniversityLookups }
+      { path: 'universities', component: Universities, title: 'Universities' },
+      { path: 'applications', component: Applications, title: 'Applications' },
+      { path: 'university-lookups', component: UniversityLookups, title: 'University Lookups' }
     ]
   },
   {
@@ -40,21 +40,23 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard([UniversityAdminRole])],
     children: [
       { path: '', redirectTo: 'campuses', pathMatch: 'full' },
-      { path: 'campuses', component: Campuses },
-      { path: 'invitations', component: Invitations },
+      { path: 'campuses', component: Campuses, title: 'Campuses' },
+      { path: 'invitations', component: Invitations, title: 'Invitations' },
     ]
   },
   {
     path: 'admin/campus',
     component: CampusAdmin,
     canActivate: [authGuard, roleGuard([CampusAdminRole])],
-    canDeactivate: [unsavedChangesGuard]
+    canDeactivate: [unsavedChangesGuard],
+    title: 'Campus Administration'
   },
   {
     path: 'map', component: Student,
-    canActivate: [authGuard, roleGuard([StandardUserRole])]
+    canActivate: [authGuard, roleGuard([StandardUserRole])],
+    title: 'Campus Map'
   },
-  { path: 'not-found', component: NotFound },
-  { path: 'server-error', component: ServerError },
+  { path: 'not-found', component: NotFound, title: 'Page Not Found' },
+  { path: 'server-error', component: ServerError, title: 'Server Error' },
   { path: '**', redirectTo: '/not-found' }
 ];

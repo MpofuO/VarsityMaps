@@ -18,63 +18,71 @@ public static class SeedData
     {
         await SeedUniversityLookupsAsync(context);
 
-        foreach (var role in Roles)
+        // 2. Seed Identity Roles if none exist
+        if (!await roleManager.Roles.AnyAsync())
         {
-            if (!await roleManager.RoleExistsAsync(role))
+            foreach (var role in Roles)
+            {
                 await roleManager.CreateAsync(new IdentityRole(role));
+            }
         }
-        var ufs = await GetOrCreateUniversityAsync(context, "University of the Free State", "UFS");
-        var ufsCampuses = await GetOrCreateCampusesAsync(context, ufs, new[]
+
+        if (!await context.Universities.AnyAsync())
         {
-            ("Bloemfontein Campus", "BFN", 26.186551964831427, -29.110679111224844),
-            ("Qwaqwa Campus", "QWA", 28.824826842929767, -28.485617112378254),
-            ("South Campus", "SC", 26.215961433775213, -29.1829977986486), 
-        });
+            var ufs = await GetOrCreateUniversityAsync(context, "University of the Free State", "UFS");
+            var ufsCampuses = await GetOrCreateCampusesAsync(context, ufs, new[]
+            {
+                ("Bloemfontein Campus", "BFN", 26.186551964831427, -29.110679111224844),
+                ("Qwaqwa Campus", "QWA", 28.824826842929767, -28.485617112378254),
+                ("South Campus", "SC", 26.215961433775213, -29.1829977986486), 
+            });
 
-        var uct = await GetOrCreateUniversityAsync(context, "University of Cape Town", "UCT");
-        var uctCampuses = await GetOrCreateCampusesAsync(context, uct, new[]
-        {
-            ("Upper Campus", "UPP", 18.4612, -33.9578),
-            ("Hiddingh Campus", "HID", 18.4172, -33.9249),
-        });
+            var uct = await GetOrCreateUniversityAsync(context, "University of Cape Town", "UCT");
+            var uctCampuses = await GetOrCreateCampusesAsync(context, uct, new[]
+            {
+                ("Upper Campus", "UPP", 18.4612, -33.9578),
+                ("Hiddingh Campus", "HID", 18.4172, -33.9249),
+            });
 
-        var ru = await GetOrCreateUniversityAsync(context, "Rhodes University", "RU");
-        var ruCampuses = await GetOrCreateCampusesAsync(context, ru, new[]
-        {
-            ("Grahamstown Campus", "GTN", 26.52072490284499, -33.313311480526714) 
-        });
+            var ru = await GetOrCreateUniversityAsync(context, "Rhodes University", "RU");
+            var ruCampuses = await GetOrCreateCampusesAsync(context, ru, new[]
+            {
+                ("Grahamstown Campus", "GTN", 26.52072490284499, -33.313311480526714) 
+            });
 
-        await SeedUserAsync(userManager, "sysadmin@vmaps.com", "Pass@123",
-            "SystemAdmin", universityId: 0, campusId: null);
+            if (!await userManager.Users.IgnoreQueryFilters().AnyAsync())
+            {
+                await SeedUserAsync(userManager, "sysadmin@vmaps.com", "Pass@123",
+                    "SystemAdmin", universityId: 0, campusId: null);
 
-        await SeedUserAsync(userManager, "uniadmin.ufs@vmaps.com", "Pass@123",
-            "UniversityAdmin", ufs.UniversityId, campusId: null);
-        await SeedUserAsync(userManager, "campusadmin.bfn@vmaps.com", "Pass@123",
-            "CampusAdmin", ufs.UniversityId, ufsCampuses[0].CampusId);
-        await SeedUserAsync(userManager, "standard.ufs@vmaps.com", "Pass@123",
-            "StandardUser", ufs.UniversityId, ufsCampuses[0].CampusId);
+                await SeedUserAsync(userManager, "uniadmin.ufs@vmaps.com", "Pass@123",
+                    "UniversityAdmin", ufs.UniversityId, campusId: null);
+                await SeedUserAsync(userManager, "campusadmin.bfn@vmaps.com", "Pass@123",
+                    "CampusAdmin", ufs.UniversityId, ufsCampuses[0].CampusId);
+                await SeedUserAsync(userManager, "standard.ufs@vmaps.com", "Pass@123",
+                    "StandardUser", ufs.UniversityId, ufsCampuses[0].CampusId);
 
-        await SeedUserAsync(userManager, "uniadmin.uct@vmaps.com", "Pass@123",
-            "UniversityAdmin", uct.UniversityId, campusId: null);
-        await SeedUserAsync(userManager, "campusadmin.upper@vmaps.com", "Pass@123",
-            "CampusAdmin", uct.UniversityId, uctCampuses[0].CampusId);
-        await SeedUserAsync(userManager, "standard.uct@vmaps.com", "Pass@123",
-            "StandardUser", uct.UniversityId, uctCampuses[0].CampusId);
+                await SeedUserAsync(userManager, "uniadmin.uct@vmaps.com", "Pass@123",
+                    "UniversityAdmin", uct.UniversityId, campusId: null);
+                await SeedUserAsync(userManager, "campusadmin.upper@vmaps.com", "Pass@123",
+                    "CampusAdmin", uct.UniversityId, uctCampuses[0].CampusId);
+                await SeedUserAsync(userManager, "standard.uct@vmaps.com", "Pass@123",
+                    "StandardUser", uct.UniversityId, uctCampuses[0].CampusId);
 
-        await SeedUserAsync(userManager, "uniadmin.ru@vmaps.com", "Pass@123",
-            "UniversityAdmin", ru.UniversityId, campusId: null);
-        await SeedUserAsync(userManager, "campusadmin.gtown@vmaps.com", "Pass@123",
-            "CampusAdmin", ru.UniversityId, ruCampuses[0].CampusId);
-        await SeedUserAsync(userManager, "standard.ru@vmaps.com", "Pass@123",
-            "StandardUser", ru.UniversityId, ruCampuses[0].CampusId);
+                await SeedUserAsync(userManager, "uniadmin.ru@vmaps.com", "Pass@123",
+                    "UniversityAdmin", ru.UniversityId, campusId: null);
+                await SeedUserAsync(userManager, "campusadmin.gtown@vmaps.com", "Pass@123",
+                    "CampusAdmin", ru.UniversityId, ruCampuses[0].CampusId);
+                await SeedUserAsync(userManager, "standard.ru@vmaps.com", "Pass@123",
+                    "StandardUser", ru.UniversityId, ruCampuses[0].CampusId);
+            }
+        }
     }
 
     private static async Task SeedUniversityLookupsAsync(AppDbContext context)
     {
-        var existingNames = (await context.UniversityLookups
-                .Select(lookup => lookup.Name)
-                .ToListAsync())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // Skip lookup insertion if the table already contains entries
+        if (await context.UniversityLookups.AnyAsync()) return;
 
         var seedLookups = new[]
         {
@@ -124,8 +132,6 @@ public static class SeedData
 
         foreach (var (name, latitude, longitude) in seedLookups)
         {
-            if (!existingNames.Add(name)) continue;
-
             context.UniversityLookups.Add(new UniversityLookup
             {
                 Name = name,
@@ -134,8 +140,7 @@ public static class SeedData
             });
         }
 
-        if (context.ChangeTracker.HasChanges())
-            await context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 
     private static async Task<University> GetOrCreateUniversityAsync(AppDbContext context, string name, string alias)
@@ -182,10 +187,10 @@ public static class SeedData
         UserManager<AppUser> userManager, string email, string password,
         string role, int universityId, int? campusId)
     {
+        var normalized = userManager.NormalizeEmail(email);
         if (await userManager.Users
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(user=>user.Email!.ToLower() == email.ToUpper())
-                is not null)
+                .AnyAsync(user => user.NormalizedEmail == normalized))
             return;
 
         var user = new AppUser

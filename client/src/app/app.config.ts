@@ -1,7 +1,8 @@
 import { ApplicationConfig, inject, provideAppInitializer, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { provideRouter, TitleStrategy } from '@angular/router';
 import { routes } from './app.routes';
+import { AppTitleStrategy } from '../core/services/app-title-strategy';
 import { JwtInterceptor } from '../core/interceptors/jwt-interceptor';
 import { ErrorInterceptor } from '../core/interceptors/error-interceptor';
 import { LoadingInterceptor } from '../core/interceptors/loading-interceptor';
@@ -12,6 +13,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes),
+    { provide: TitleStrategy, useClass: AppTitleStrategy },
     provideHttpClient(withInterceptorsFromDi()),
     provideAppInitializer(() => {
       const initService = inject(InitService);

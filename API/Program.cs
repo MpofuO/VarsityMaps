@@ -19,7 +19,14 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        x => x.UseNetTopologySuite()
+        sqlOptions =>
+        {
+            sqlOptions.UseNetTopologySuite();
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+        }
     )
 );
 
@@ -69,10 +76,10 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 app.UseCors(policy => policy
-.AllowAnyHeader()
-.AllowAnyMethod()
-.AllowCredentials()
-.WithOrigins("http://localhost:4200", "https://localhost:4200"));
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowCredentials()
+    .WithOrigins("http://localhost:4200", "https://localhost:4200"));
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -83,32 +90,34 @@ app.UseStaticFiles();
 app.MapControllers();
 app.MapFallbackToController("Index", "Fallback");
 
-using var scope = app.Services.CreateScope();
-var services = scope.ServiceProvider;
-var logger = services.GetRequiredService<ILogger<Program>>();
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
 
-try
-{
-    var context = services.GetRequiredService<AppDbContext>();
-    await context.Database.MigrateAsync();
-}
-catch (Exception ex)
-{
-    logger.LogError(ex, "Database migration failed");
-    throw;
-}
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        var executionStrategy = context.Database.CreateExecutionStrategy();
 
-try
-{
-    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    var userManager = services.GetRequiredService<UserManager<AppUser>>();
-    var context = services.GetRequiredService<AppDbContext>();
-    await SeedData.SeedAsync(context, roleManager, userManager);
-}
-catch (Exception ex)
-{
-    logger.LogError(ex, "User/role seeding failed");
-    throw;
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+            if (pendingMigrations.Any())
+            {
+                await context.Database.MigrateAsync();
+            }
+
+            var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+            var userManager = services.GetRequiredService<UserManager<AppUser>>();
+            await SeedData.SeedAsync(context, roleManager, userManager);
+        });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        throw;
+    }
 }
 
 app.Run();

@@ -335,8 +335,9 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
 
     private async Task<(AppUser, bool)> GetUserByEmailFromAll(string email)
     {
+        var normalized = userManager.NormalizeEmail(email);
         var user = await userManager.Users.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Email!.ToLower() == email.ToLower());
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalized);
         if (user is not null)
             return (user, false);
         return (new AppUser
