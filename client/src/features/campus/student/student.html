@@ -45,7 +45,21 @@
             @if (isOffRoute()) {
               <div class="p-3 bg-warning/10 border border-warning/40 rounded-box space-y-2">
                 <div class="font-semibold text-sm">You are off route</div>
-                @if (showDeviationPrompt()) {
+                @if (showRecalculationPhasePrompt()) {
+                  <p class="text-xs">Are you still driving/riding, or have you started walking?</p>
+                  <div class="flex flex-col gap-2">
+                    <button class="btn btn-warning btn-sm w-full" [disabled]="isRecalculating()" (click)="recalculateRoute(false)">
+                      @if (isRecalculating()) { <span class="loading loading-spinner loading-xs"></span> }
+                      Still driving/riding
+                    </button>
+                    <button class="btn btn-warning btn-sm w-full" [disabled]="isRecalculating()" (click)="recalculateRoute(true)">
+                      Already walking
+                    </button>
+                    <button class="btn btn-ghost btn-sm w-full" [disabled]="isRecalculating()" (click)="showRecalculationPhasePrompt.set(false)">
+                      Cancel
+                    </button>
+                  </div>
+                } @else if (showDeviationPrompt()) {
                   <p class="text-xs">Return to the highlighted path, or recalculate from your current location.</p>
                   <div class="flex gap-2">
                     <button class="btn btn-warning btn-sm flex-1" [disabled]="isRecalculating()" (click)="recalculateRoute()">

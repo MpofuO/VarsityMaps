@@ -30,7 +30,7 @@ public static class AppUserExtensions
     public static async Task<int> GetCurrentUniversityIdAsync(this ClaimsPrincipal user, UserManager<AppUser> userManager)
     {
         var appUser = await userManager.FindByNameAsync(user.Identity!.Name!);
-        return appUser?.CurrentUniversityId ?? 0;
+        return appUser?.CurrentUniversityId ?? appUser?.UniversityId ?? 0;
     }
 
     public static async Task<int> GetActiveUniversityIdAsync(this ClaimsPrincipal user,
@@ -43,7 +43,7 @@ public static class AppUserExtensions
     public static async Task<(int, bool)> GetCampusIdAsync(this ClaimsPrincipal user, UserManager<AppUser> userManager)
     {
         var appUser = await userManager.FindByNameAsync(user.Identity!.Name!);
-        return (appUser?.CampusId ?? 0, appUser?.UniversityId != appUser?.CurrentUniversityId);
+        return (appUser?.CampusId ?? 0, appUser?.CurrentUniversityId != null && appUser?.UniversityId != appUser?.CurrentUniversityId);
     }
 
     public static async Task<(int CampusId, bool IsGuest)> GetNavigationContextAsync(

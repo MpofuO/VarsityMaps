@@ -27,7 +27,7 @@ public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow)
     public async Task<ActionResult<CampusDto>> Get(int id)
     {
         var campus = await uow.CampusRepository.GetByIdAsync(id);
-        if (campus is null) return NotFound();
+        if (campus is null) return BadRequest("Campus not found.");
         return Ok(campus.ToDto());
     }
 
@@ -66,7 +66,7 @@ public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow)
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
         var campus = await uow.CampusRepository.GetByIdAsync(id);
-        if (campus is null) return NotFound();
+        if (campus is null) return BadRequest("Campus not found.");
 
         var existingCampuses = (await uow.CampusRepository.GetByUniversityAsync(campus.UniversityId))
             .Where(c => c.CampusId != id);
@@ -93,10 +93,10 @@ public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow)
     public async Task<ActionResult<CampusAdminDto>> GetAssignedAdmin(int campusId)
     {
         var campus = await uow.CampusRepository.GetByIdAsync(campusId);
-        if (campus is null) return NotFound();
+        if (campus is null) return BadRequest("Campus not found.");
 
         var admin = await GetVerifiedCampusAdmin(campusId);
-        if (admin is null) return NoContent();
+        if (admin is null) return BadRequest("No verified campus admin found.");
 
         return Ok(new CampusAdminDto
         {
@@ -111,7 +111,7 @@ public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow)
     public async Task<ActionResult> ToggleSuspendAdmin(int campusId, [FromBody] bool suspend)
     {
         var admin = await GetVerifiedCampusAdmin(campusId);
-        if (admin is null) return NotFound();
+        if (admin is null) return BadRequest("No verified campus admin found.");
 
         admin.IsActive = !suspend;
         var result = await userManager.UpdateAsync(admin);
@@ -124,7 +124,7 @@ public class CampusController(UserManager<AppUser> userManager, IUnitOfWork uow)
     public async Task<ActionResult> RemoveAdmin(int campusId)
     {
         var admin = await GetVerifiedCampusAdmin(campusId);
-        if (admin is null) return NotFound();
+        if (admin is null) return BadRequest("No verified campus admin found.");
         
         var result = await userManager.RemoveFromRoleAsync(admin, "CampusAdmin");
         if(!result.Succeeded) return BadRequest("Failed to remove admin.");

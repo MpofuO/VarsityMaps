@@ -50,6 +50,7 @@ export class Student implements OnInit, OnDestroy {
   protected readonly isOffRoute = signal(false);
   protected readonly showDeviationPrompt = signal(false);
   protected readonly isRecalculating = signal(false);
+  protected readonly showRecalculationPhasePrompt = signal(false);
 
   protected readonly activePickField = signal<PickField>(null);
   protected readonly originBuildingId = signal<number | null>(null);
@@ -183,15 +184,15 @@ export class Student implements OnInit, OnDestroy {
   });
 
   constructor() {
-  effect(() => {
-    const user = this.accountService.currentUser();
-    if (user?.universityId && user.campusId) {
-      this.loadCampus(user.universityId, user.campusId);
-      this.loadBuildings();
-    }
-  });
+    effect(() => {
+      const user = this.accountService.currentUser();
+      if (user?.universityId && user.campusId) {
+        this.loadCampus(user.universityId, user.campusId);
+        this.loadBuildings();
+      }
+    });
 
-  effect(() => {
+    effect(() => {
       const selectedId = this.selectedBuildingId();
       if (selectedId !== null) {
         setTimeout(() => {
@@ -201,20 +202,20 @@ export class Student implements OnInit, OnDestroy {
       }
     });
 
-  effect(() => {
-    this.originBuildingId();
-    this.originLocation();
-    this.destinationBuildingId();
-    this.selectedTravelMode();
+    effect(() => {
+      this.originBuildingId();
+      this.originLocation();
+      this.destinationBuildingId();
+      this.selectedTravelMode();
 
-    if (!this.isNavigating()) {
-      this.routes.set([]);
-      this.selectedRouteIndex.set(0);
-      this.originParkingAreaId.set(null);
-      this.originParkingOptions.set([]);
-    }
-  });
-}
+      if (!this.isNavigating()) {
+        this.routes.set([]);
+        this.selectedRouteIndex.set(0);
+        this.originParkingAreaId.set(null);
+        this.originParkingOptions.set([]);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.locationSub = this.locationService.location$.subscribe((loc) => {
@@ -519,10 +520,18 @@ export class Student implements OnInit, OnDestroy {
     this.currentInstruction.set('Return to the highlighted route to resume guidance.');
   }
 
-  recalculateRoute(): void {
+  recalculateRoute(isWalkingLeg?: boolean): void {
     const location = this.currentLocation();
     const route = this.activeRoute();
     if (!location || !route || this.isRecalculating()) return;
+
+    const hasVehicleAndWalkingLegs =
+      route.transitionParkingAreaId !== null &&
+      (route.travelMode === TravelMode.Car || route.travelMode === TravelMode.Bus);
+    if (isWalkingLeg === undefined && hasVehicleAndWalkingLegs) {
+      this.showRecalculationPhasePrompt.set(true);
+      return;
+    }
 
     this.isRecalculating.set(true);
     this.navigationService.getLiveRoute(
@@ -530,7 +539,9 @@ export class Student implements OnInit, OnDestroy {
       location.longitude,
       route.toBuildingId,
       route.travelMode,
-      this.destinationInterest()
+      this.destinationInterest(),
+      isWalkingLeg ?? null,
+      isWalkingLeg === false ? route.transitionParkingAreaId : null
     ).subscribe({
       next: (result) => {
         result.route.routeGuides = result.routeGuides;
@@ -542,6 +553,7 @@ export class Student implements OnInit, OnDestroy {
         this.remainingRouteDistance.set(Math.round(this.routeDistance(result.route.path.coordinates)));
         this.isOffRoute.set(false);
         this.showDeviationPrompt.set(false);
+        this.showRecalculationPhasePrompt.set(false);
         this.deviationSamples = 0;
         this.onRouteSamples = 0;
         this.checkInitialDeviation = true;
@@ -582,6 +594,7 @@ export class Student implements OnInit, OnDestroy {
     this.destinationBuildingId.set(null);
     this.isOffRoute.set(false);
     this.showDeviationPrompt.set(false);
+    this.showRecalculationPhasePrompt.set(false);
     this.deviationSamples = 0;
     this.onRouteSamples = 0;
     this.checkInitialDeviation = false;

@@ -35,10 +35,10 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
     public async Task<ActionResult<BuildingDto>> GetBuilding(int id)
     {
         var building = await uow.BuildingRepository.GetWithEntrancesAsync(id);
-        if (building is null) return NotFound();
+        if (building is null) return BadRequest("Building not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (building.CampusId != callerCampusId) return NotFound();
+        if (building.CampusId != callerCampusId) return BadRequest("Building not found.");
 
         return Ok(building.ToDto());
     }
@@ -86,10 +86,10 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
         var building = await uow.BuildingRepository.GetByIdAsync(buildingId);
-        if (building is null) return NotFound();
+        if (building is null) return BadRequest("Building not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (building.CampusId != callerCampusId) return NotFound();
+        if (building.CampusId != callerCampusId) return BadRequest("Building not found.");
 
         var existingBuilding = await uow.BuildingRepository.GetByNameAsync(callerCampusId, buildingDto.Name);
         if (existingBuilding != null && existingBuilding.BuildingId != building.BuildingId)
@@ -114,10 +114,10 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
     public async Task<ActionResult> DeleteBuilding(int buildingId)
     {
         var building = await uow.BuildingRepository.GetWithEntrancesAsync(buildingId);
-        if (building is null) return NotFound();
+        if (building is null) return BadRequest("Building not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (building.CampusId != callerCampusId) return NotFound();
+        if (building.CampusId != callerCampusId) return BadRequest("Building not found.");
 
         foreach (Node entrance in building.Entrances)
         {

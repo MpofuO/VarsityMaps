@@ -34,10 +34,10 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
     public async Task<ActionResult<ParkingAreaDto>> GetParkingArea(int id)
     {
         var parkingArea = await uow.ParkingAreaRepository.GetWithAccessNodesAsync(id);
-        if (parkingArea is null) return NotFound();
+        if (parkingArea is null) return BadRequest("Parking area not found.");
 
         var (campusId, _) = await User.GetCampusIdAsync(userManager);
-        if (parkingArea.CampusId != campusId) return NotFound();
+        if (parkingArea.CampusId != campusId) return BadRequest("Parking area not found.");
 
         return Ok(parkingArea.ToDto());
     }
@@ -86,10 +86,10 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
         var parkingArea = await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId);
-        if (parkingArea is null) return NotFound();
+        if (parkingArea is null) return BadRequest("Parking area not found.");
 
         var (campusId, _) = await User.GetCampusIdAsync(userManager);
-        if (parkingArea.CampusId != campusId) return NotFound();
+        if (parkingArea.CampusId != campusId) return BadRequest("Parking area not found.");
 
         var existingAreas = await uow.ParkingAreaRepository.GetByCampusAsync(campusId);
         if (existingAreas.Any(p => p.ParkingAreaId != parkingAreaId &&
@@ -115,10 +115,10 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
     public async Task<ActionResult> DeleteParkingArea(int parkingAreaId)
     {
         var parkingArea = await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId);
-        if (parkingArea is null) return NotFound();
+        if (parkingArea is null) return BadRequest("Parking area not found.");
 
         var (campusId, _) = await User.GetCampusIdAsync(userManager);
-        if (parkingArea.CampusId != campusId) return NotFound();
+        if (parkingArea.CampusId != campusId) return BadRequest("Parking area not found.");
 
         var accessNodes = (await uow.NodeRepository.GetByParkingAreaAsync(parkingAreaId)).ToList();
         foreach (var node in accessNodes)

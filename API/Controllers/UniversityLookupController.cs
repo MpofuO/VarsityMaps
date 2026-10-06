@@ -42,7 +42,7 @@ public class UniversityLookupController(IUnitOfWork uow) : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var lookup = await uow.UniversityLookupRepository.GetByIdAsync(id);
-        if (lookup is null) return NotFound();
+        if (lookup is null) return BadRequest("Location lookup not found.");
         if (await NameExistsAsync(model.Name, id)) return BadRequest("A lookup with this name already exists.");
 
         lookup.Name = model.Name.Trim();
@@ -58,7 +58,7 @@ public class UniversityLookupController(IUnitOfWork uow) : ControllerBase
     public async Task<ActionResult> Delete(int id)
     {
         var lookup = await uow.UniversityLookupRepository.GetByIdAsync(id);
-        if (lookup is null) return NotFound();
+        if (lookup is null) return BadRequest("Location lookup not found.");
 
         await uow.UniversityLookupRepository.DeleteAsync(lookup);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to delete location lookup.");

@@ -72,6 +72,7 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
         if (!isNew && !wasDeleted) return BadRequest("This email is already in use.");
 
         user.UniversityId = registerDto.UniversityId;
+        user.CurrentUniversityId = registerDto.UniversityId;
         user.CampusId = registerDto.CampusId;
         user.IsActive = true;
         user.IsDeleted = false;
@@ -241,7 +242,7 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
     {
         var universityId = await User.GetActiveUniversityIdAsync(userManager, User.IsInRole("StandardUser"));
         var university = await uow.UniversityRepository.GetByIdAsync(universityId);
-        if (university is null) return NotFound();
+        if (university is null) return BadRequest("University not found");
         return Ok(university.ToDto());
     }
 
@@ -250,7 +251,7 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
     public async Task<IActionResult> SwitchCampus([FromBody] int campusId)
     {
         var user = await userManager.FindByNameAsync(User?.Identity?.Name!);
-        if (user is null) return BadRequest();
+        if (user is null) return BadRequest("User not found");
 
         var campus = await uow.CampusRepository.GetByIdAsync(campusId);
         if (campus is null) return BadRequest("Campus not found");
@@ -268,7 +269,7 @@ public class AccountController(UserManager<AppUser> userManager, IUnitOfWork uow
     public async Task<IActionResult> SwitchInstitution([FromBody] int universityId)
     {
         var user = await userManager.FindByNameAsync(User?.Identity?.Name!);
-        if (user is null) return BadRequest();
+        if (user is null) return BadRequest("User not found");
 
         var university = await uow.UniversityRepository.GetWithCampusesAsync(universityId);
         if (university is null) return BadRequest("University not found");

@@ -67,37 +67,41 @@ public class RouteService : IRouteService
         const int snapNodeId = int.MinValue + 1;
         const double maxSnapDistanceMeters = 75;
 
-        var nearestEdge = navigableEdges
+        var nearbyEdges = navigableEdges
             .Select(edge => (Edge: edge, Projection: ProjectOntoEdge(origin, edge)))
             .Where(candidate => candidate.Projection.DistanceMeters <= maxSnapDistanceMeters)
             .OrderBy(candidate => candidate.Projection.DistanceMeters)
-            .FirstOrDefault();
+            .ToList();
 
-        if (nearestEdge.Edge is null)
-            return [];
-
-        var originNode = new Node
+        foreach (var candidate in nearbyEdges)
         {
-            NodeId = originNodeId,
-            CampusId = nearestEdge.Edge.CampusId,
-            Location = origin
-        };
-        var snapNode = new Node
-        {
-            NodeId = snapNodeId,
-            CampusId = nearestEdge.Edge.CampusId,
-            Location = nearestEdge.Projection.Location
-        };
+            var originNode = new Node
+            {
+                NodeId = originNodeId,
+                CampusId = candidate.Edge.CampusId,
+                Location = origin
+            };
+            var snapNode = new Node
+            {
+                NodeId = snapNodeId,
+                CampusId = candidate.Edge.CampusId,
+                Location = candidate.Projection.Location
+            };
 
-        var edges = navigableEdges.ToList();
-        edges.Add(CreateTemporaryEdge(originNode, snapNode, (decimal)nearestEdge.Projection.DistanceMeters,
-            nearestEdge.Edge));
-        edges.Add(CreateTemporaryEdge(snapNode, nearestEdge.Edge.FromNode,
-            nearestEdge.Edge.Weight * (decimal)nearestEdge.Projection.Fraction, nearestEdge.Edge));
-        edges.Add(CreateTemporaryEdge(snapNode, nearestEdge.Edge.ToNode,
-            nearestEdge.Edge.Weight * (decimal)(1 - nearestEdge.Projection.Fraction), nearestEdge.Edge));
+            var edges = navigableEdges.ToList();
+            edges.Add(CreateTemporaryEdge(originNode, snapNode, (decimal)candidate.Projection.DistanceMeters,
+                candidate.Edge));
+            edges.Add(CreateTemporaryEdge(snapNode, candidate.Edge.FromNode,
+                candidate.Edge.Weight * (decimal)candidate.Projection.Fraction, candidate.Edge));
+            edges.Add(CreateTemporaryEdge(snapNode, candidate.Edge.ToNode,
+                candidate.Edge.Weight * (decimal)(1 - candidate.Projection.Fraction), candidate.Edge));
 
-        return GetShortestPath(edges, [originNode], destinationEntrances);
+            var routes = GetShortestPath(edges, [originNode], destinationEntrances);
+            if (routes.Count > 0)
+                return routes;
+        }
+
+        return [];
     }
 
     public List<Route> GetMultiLegPath(IReadOnlyList<Edge> drivingEdges, IReadOnlyList<Edge> walkingEdges,

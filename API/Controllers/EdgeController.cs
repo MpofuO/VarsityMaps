@@ -66,10 +66,10 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     public async Task<ActionResult<EdgeDto>> UpdateEdge(int edgeId, EdgePropertiesDto dto)
     {
         var edge = await uow.EdgeRepository.GetByIdAsync(edgeId);
-        if (edge is null) return NotFound();
+        if (edge is null) return BadRequest("Path not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (edge.CampusId != callerCampusId) return NotFound();
+        if (edge.CampusId != callerCampusId) return BadRequest("Path not found.");
 
         edge.Name = dto.Name;
         edge.IsClosed = dto.IsClosed;
@@ -112,7 +112,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     public async Task<ActionResult> DeleteEdge(int edgeId)
     {
         var edge = await uow.EdgeRepository.GetByIdAsync(edgeId);
-        if (edge is null) return NotFound();
+        if (edge is null) return BadRequest("Edge not found.");
 
         await uow.EdgeRepository.DeleteAsync(edge);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to delete edge.");

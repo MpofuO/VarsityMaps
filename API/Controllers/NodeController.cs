@@ -31,8 +31,8 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
 
         var building = await uow.BuildingRepository.GetByIdAsync(buildingId);
-        if (building is null) return NotFound("Building not found.");
-        if (building.CampusId != callerCampusId) return NotFound("Building not found.");
+        if (building is null) return BadRequest("Building not found.");
+        if (building.CampusId != callerCampusId) return BadRequest("Building not found.");
 
         if (building.Boundary.Contains(nodeDto.Location))
             return BadRequest("Entrance node cannot be placed inside the building.");
@@ -65,7 +65,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
         var parkingArea = await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId);
         if (parkingArea is null || parkingArea.CampusId != callerCampusId)
-            return NotFound("Parking area not found.");
+            return BadRequest("Parking area not found.");
 
         if (parkingArea.Boundary.Contains(nodeDto.Location))
             return BadRequest("Parking access node cannot be placed inside the parking area.");
@@ -158,10 +158,10 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     public async Task<ActionResult<NodeDto>> RenameNode(int nodeId, [FromBody] RenameDto renameDto)
     {
         var node = await uow.NodeRepository.GetByIdAsync(nodeId);
-        if (node is null) return NotFound();
+        if (node is null) return BadRequest("Node not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (node.CampusId != callerCampusId) return NotFound();
+        if (node.CampusId != callerCampusId) return BadRequest("Node not found.");
 
         node.Name = renameDto.Name;
         await uow.NodeRepository.UpdateAsync(node);
@@ -173,10 +173,10 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     public async Task<ActionResult<NodeDto>> UpdateNodeDetails(int nodeId, [FromBody] NodeDetailsDto detailsDto)
     {
         var node = await uow.NodeRepository.GetByIdAsync(nodeId);
-        if (node is null) return NotFound();
+        if (node is null) return BadRequest("Node not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (node.CampusId != callerCampusId) return NotFound();
+        if (node.CampusId != callerCampusId) return BadRequest("Node not found.");
 
         node.Name = detailsDto.Name;
         if (node.BuildingId is int buildingId)
@@ -198,10 +198,10 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
     public async Task<ActionResult> DeleteNode(int nodeId)
     {
         var node = await uow.NodeRepository.GetByIdAsync(nodeId);
-        if (node is null) return NotFound();
+        if (node is null) return BadRequest("Node not found.");
 
         var (callerCampusId, _) = await User.GetCampusIdAsync(userManager);
-        if (node.CampusId != callerCampusId) return NotFound();
+        if (node.CampusId != callerCampusId) return BadRequest("Node not found.");
 
         if (node.BuildingId is int buildingId)
             await uow.RouteRepository.DeleteByBuildingAsync(buildingId);

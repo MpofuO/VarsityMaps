@@ -28,7 +28,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<InvitationDto>> Get(int id)
     {
         var invitation = await uow.InvitationRepository.GetWithDetailsAsync(id);
-        if (invitation is null) return NotFound();
+        if (invitation is null) return BadRequest("Invitation not found.");
         return Ok(invitation.ToDto());
     }
 
@@ -36,10 +36,10 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<int>> GetPendingInvitationId(int campusId)
     {
         var campus = await uow.CampusRepository.GetByIdAsync(campusId);
-        if (campus is null) return NotFound();
+        if (campus is null) return BadRequest("Campus not found.");
 
         var universityId = await User.GetUniversityIdAsync(userManager);
-        if (campus.UniversityId != universityId) return Forbid();
+        if (campus.UniversityId != universityId) return BadRequest("Campus not found.");
 
         var pending = await uow.InvitationRepository.GetPendingInvitationAsync(campusId);
         return Ok(pending?.InvitationId ?? 0);
@@ -94,7 +94,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<InvitationDto>> UpdateDuration(int id, [FromBody] int duration)
     {
         var invitation = await uow.InvitationRepository.GetByIdAsync(id);
-        if (invitation is null) return NotFound();
+        if (invitation is null) return BadRequest("Invitation not found.");
         if (invitation.IsAccepted) return BadRequest("Cannot update an accepted invitation.");
         if (invitation.IsRevoked) return BadRequest("Cannot update a revoked invitation.");
 
@@ -114,7 +114,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<InvitationDto>> ResetPin(int id)
     {
         var invitation = await uow.InvitationRepository.GetByIdAsync(id);
-        if (invitation is null) return NotFound();
+        if (invitation is null) return BadRequest("Invitation not found.");
         if (invitation.IsAccepted) return BadRequest("Cannot reset PIN for an accepted invitation.");
         if (invitation.IsRevoked) return BadRequest("Cannot reset PIN for a revoked invitation.");
 
@@ -141,7 +141,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<InvitationDto>> Resend(int id)
     {
         var invitation = await uow.InvitationRepository.GetByIdAsync(id);
-        if (invitation is null) return NotFound();
+        if (invitation is null) return BadRequest("Invitation not found.");
         if (invitation.IsAccepted) return BadRequest("Cannot resend an accepted invitation.");
         if (invitation.IsRevoked) return BadRequest("Cannot resend a revoked invitation.");
 
@@ -166,7 +166,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<InvitationDto>> Revoke(int id)
     {
         var invitation = await uow.InvitationRepository.GetByIdAsync(id);
-        if (invitation is null) return NotFound();
+        if (invitation is null) return BadRequest("Invitation not found.");
         if (invitation.IsAccepted) return BadRequest("Cannot revoke an accepted invitation.");
 
         invitation.IsRevoked = true;
@@ -181,7 +181,7 @@ public class InvitationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult> Reject(int id)
     {
         var invitation = await uow.InvitationRepository.GetByIdAsync(id);
-        if (invitation is null) return NotFound();
+        if (invitation is null) return BadRequest("Invitation not found.");
         if (invitation.IsAccepted) return BadRequest("This invitation has already been accepted.");
         if (invitation.IsRevoked) return BadRequest("This invitation has already been revoked.");
 

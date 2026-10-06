@@ -42,7 +42,7 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
     {
         var campuses = await uow.CampusRepository.GetByUniversityAsync(universityId);
         if (campuses is null || !campuses.Any())
-            return NotFound("No campuses found for the specified university.");
+            return BadRequest("No campuses found for the specified university.");
         return Ok(campuses.OrderBy(c => c.Name).Select(c => c.ToDto()));
     }
 
@@ -117,7 +117,7 @@ public class UniversityController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult> Adjudicate(int id, [FromQuery] bool isApproved, [FromBody] string? reason)
     {
         var application = await uow.ApplicationRepository.GetByIdAsync(id);
-        if (application is null) return NotFound("Application not found.");
+        if (application is null) return BadRequest("Application not found.");
 
         var user = await userManager.FindByIdAsync(application.UserId);
         if (user is null) return BadRequest("Applicant account not found.");

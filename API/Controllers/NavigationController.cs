@@ -291,8 +291,94 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         var originBuilding = (await uow.BuildingRepository.GetByCampusAsync(campusId))
             .FirstOrDefault(building => building.Boundary.Covers(origin));
         List<Route> routes;
+        var routeTravelMode = request.Mode;
 
-        if (originBuilding is not null)
+        if (request.IsWalkingLeg is not null)
+        {
+            if (request.Mode is not (TravelMode.Car or TravelMode.Bus))
+                return BadRequest("A travel phase can only be specified for car or bus routes.");
+
+            if (request.IsWalkingLeg.Value)
+            {
+                List<Node> originEntrances = originBuilding is null
+                    ? []
+                    : (await uow.NodeRepository.GetByBuildingAsync(originBuilding.BuildingId)).ToList();
+                if (originBuilding is not null && originEntrances.Count == 0)
+                    return BadRequest("Your current building has no registered entrances.");
+
+                var walkingEdges = isGuest
+                    ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, TravelMode.Walking)
+                    : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, TravelMode.Walking);
+                var navigableWalkingEdges = walkingEdges
+                    .Where(edge => !(edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow)))
+                    .ToList();
+
+                routes = originBuilding is null
+                    ? routeService.GetShortestPathFromLocation(navigableWalkingEdges, origin, destinationEntrances)
+                    : routeService.GetShortestPath(navigableWalkingEdges, originEntrances, destinationEntrances);
+                routeTravelMode = TravelMode.Walking;
+            }
+            else
+            {
+                if (request.DestinationParkingAreaId is null)
+                    return BadRequest("A destination parking area is required while recalculating a vehicle leg.");
+
+                var destinationParkingArea = (await uow.ParkingAreaRepository.GetByCampusAsync(campusId))
+                    .FirstOrDefault(parking =>
+                        parking.ParkingAreaId == request.DestinationParkingAreaId.Value &&
+                        parking.IsAccessible &&
+                        (!isGuest || parking.IsGuestAccessible) &&
+                        parking.AccessNodes.Any());
+                if (destinationParkingArea is null)
+                    return BadRequest("The destination parking area is unavailable.");
+
+                var drivingEdges = isGuest
+                    ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, request.Mode)
+                    : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, request.Mode);
+                var navigableDrivingEdges = drivingEdges
+                    .Where(edge => !(edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow)))
+                    .ToList();
+
+                var vehicleLegs = routeService.GetShortestPathFromLocation(
+                    navigableDrivingEdges, origin, destinationParkingArea.AccessNodes);
+
+                var walkingEdges = isGuest
+                    ? await uow.EdgeRepository.GetGuestNavigableEdgesAsync(campusId, TravelMode.Walking)
+                    : await uow.EdgeRepository.GetNavigableEdgesAsync(campusId, TravelMode.Walking);
+                var navigableWalkingEdges = walkingEdges
+                    .Where(edge => !(edge.IsClosed && (edge.ClosedUntil == null || edge.ClosedUntil > DateTime.UtcNow)))
+                    .ToList();
+
+                routes = [];
+                foreach (var vehicleLeg in vehicleLegs)
+                {
+                    var parkingNode = destinationParkingArea.AccessNodes
+                        .FirstOrDefault(node => node.NodeId == vehicleLeg.ToNodeId);
+                    if (parkingNode is null) continue;
+
+                    var walkingLeg = routeService.GetShortestPath(
+                            navigableWalkingEdges, [parkingNode], destinationEntrances)
+                        .OrderBy(candidate => candidate.Weight)
+                        .FirstOrDefault();
+                    if (walkingLeg is null) continue;
+
+                    var vehicleCoordinates = vehicleLeg.Path.Coordinates;
+                    var walkingCoordinates = walkingLeg.Path.Coordinates;
+                    routes.Add(new Route
+                    {
+                        Path = new LineString(vehicleCoordinates.Concat(walkingCoordinates.Skip(1)).ToArray()),
+                        FromNodeId = vehicleLeg.FromNodeId,
+                        ToNodeId = walkingLeg.ToNodeId,
+                        Weight = vehicleLeg.Weight + walkingLeg.Weight,
+                        TransitionNodeId = parkingNode.NodeId,
+                        TransitionParkingAreaId = parkingNode.ParkingAreaId,
+                        TransitionLocation = new Point(walkingCoordinates[0]) { SRID = 4326 },
+                        RouteGuides = []
+                    });
+                }
+            }
+        }
+        else if (originBuilding is not null)
         {
             var originEntrances = (await uow.NodeRepository.GetByBuildingAsync(originBuilding.BuildingId)).ToList();
             if (originEntrances.Count == 0)
@@ -369,12 +455,12 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
 
         var route = routes.OrderBy(candidate => candidate.Weight).FirstOrDefault();
         if (route is null)
-            return NotFound("No navigable route could be found from your location to the destination.");
+            return BadRequest("No navigable route could be found from your location to the destination.");
 
         route.FromBuildingId = originBuilding?.BuildingId ?? 0;
         route.ToBuildingId = request.ToBuildingId;
         route.CampusId = campusId;
-        route.TravelMode = request.Mode;
+        route.TravelMode = routeTravelMode;
         route.RouteGuides = [];
 
         return Ok(new LiveRouteDto
@@ -392,7 +478,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
     {
         var route = await uow.RouteRepository.GetWithRouteGuidesAsync(routeId);
         if (route is null)
-            return NotFound("Route not found.");
+            return BadRequest("Route not found.");
 
         if (route.RouteGuides.Count == 0)
         {
@@ -442,7 +528,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
 
         var routes = routeService.GetShortestPath(campusEdges.ToList(), [startNode], [endNode]);
         if (routes is null || !routes.Any())
-            return NotFound("No route path could be found between the specified nodes.");
+            return BadRequest("No route path could be found between the specified nodes.");
 
         var shortestRoute = routes.OrderBy(r => r.Weight).First();
 
