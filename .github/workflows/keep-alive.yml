@@ -1,0 +1,20 @@
+name: Keep Azure SQL Warm
+
+on:
+  schedule:
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  ping-db:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API Health Endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://varsitymaps.azurewebsites.net/api/health)
+          echo "HTTP Response Status: $response"
+          if [ "$response" -ne 200 ]; then
+            echo "Health check failed with status $response"
+            exit 1
+          fi

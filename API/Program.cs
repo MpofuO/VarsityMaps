@@ -88,6 +88,13 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapControllers();
+
+app.MapGet("/api/health", async (AppDbContext context) =>
+{
+    await context.Database.CanConnectAsync();
+    return Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow });
+});
+
 app.MapFallbackToController("Index", "Fallback");
 
 using (var scope = app.Services.CreateScope())
