@@ -17,7 +17,7 @@ export class ErrorInterceptor implements HttpInterceptor {
         const message = this.extractMessage(error);
         if (error.status === 409) {
           this.toastService.warning(message);
-        } else {
+        } else if (error.status > 400 && error.status < 500) {
           this.toastService.error(message);
         }
 

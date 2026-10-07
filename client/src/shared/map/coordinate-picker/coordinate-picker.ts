@@ -75,7 +75,8 @@ export class CoordinatePicker implements OnInit {
         zoom: hasInitial ? SELECTED_ZOOM : DEFAULT_ZOOM,
         streetViewControl: false,
         fullscreenControl: true,
-        ...defaultMapOptions()
+        ...defaultMapOptions(),
+        mapTypeId: google.maps.MapTypeId.SATELLITE,
       });
 
       this.map.addListener('click', (event: google.maps.MapMouseEvent) => {
