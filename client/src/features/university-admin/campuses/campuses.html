@@ -31,7 +31,10 @@
             {{ campus.center.coordinates[1].toFixed(4) }}, {{ campus.center.coordinates[0].toFixed(4) }}
           </td>
           <td class="text-right">
-            <button class="btn btn-sm btn-outline btn-primary" (click)="openEdit(campus)">Edit Details</button>
+            <div class="flex justify-end gap-2">
+              <button class="btn btn-sm btn-outline" (click)="openCampusAdmin(campus)">Campus Admin</button>
+              <button class="btn btn-sm btn-outline btn-primary" (click)="openEdit(campus)">Edit Details</button>
+            </div>
           </td>
         </tr>
         } @empty {
@@ -124,6 +127,43 @@
           </button>
         </div>
   </form>
+</app-modal>
+
+<app-modal [isOpen]="isCampusAdminOpen()" [title]="adminCampus() ? adminCampus()!.name + ' Administrator' : 'Campus Administrator'"
+  (closed)="closeCampusAdmin()">
+  <div class="space-y-3 pt-2">
+    @if (isLoadingAdmin()) {
+    <div class="flex justify-center py-3">
+      <span class="loading loading-spinner loading-xs"></span>
+    </div>
+    } @else if (campusAdmin(); as admin) {
+    <div class="flex items-center justify-between bg-base-100 rounded-btn px-3 py-2 border border-base-300">
+      <div>
+        <div class="text-sm font-medium">{{ admin.email }}</div>
+        @if (admin.isActive) {
+        <span class="badge badge-success badge-xs">Active</span>
+        } @else {
+        <span class="badge badge-error badge-xs">Suspended</span>
+        }
+      </div>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-xs btn-outline" (click)="toggleSuspend()">
+          {{ admin.isActive ? 'Suspend' : 'Revoke suspension' }}
+        </button>
+        <button type="button" class="btn btn-xs btn-outline btn-error" (click)="openUnassignConfirm()">
+          Unassign
+        </button>
+      </div>
+    </div>
+    } @else {
+    <div class="text-xs text-base-content/60 italic">
+      No admin assigned yet - send an invitation from the Invitations tab.
+    </div>
+    }
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="closeCampusAdmin()">Close</button>
+    </div>
+  </div>
 </app-modal>
 
 <app-modal [isOpen]="isUnassignConfirmOpen()" title="Unassign Administrator" (closed)="closeUnassignConfirm()">

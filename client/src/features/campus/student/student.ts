@@ -59,6 +59,7 @@ export class Student implements OnInit, OnDestroy {
   protected readonly originParkingOptions = signal<ParkingAreaOption[]>([]);
   protected readonly destinationInterestOptions = signal<string[]>([]);
   protected readonly destinationInterest = signal<string | null>(null);
+  protected readonly includeAllDestinationEntrances = signal(false);
 
   protected readonly routes = signal<RouteResult[]>([]);
   protected readonly selectedRouteIndex = signal<number>(0);
@@ -299,6 +300,7 @@ export class Student implements OnInit, OnDestroy {
         return;
       }
       this.destinationInterest.set(null);
+      this.includeAllDestinationEntrances.set(false);
       this.destinationInterestOptions.set([]);
       this.originParkingAreaId.set(null);
       this.originParkingOptions.set([]);
@@ -387,6 +389,7 @@ export class Student implements OnInit, OnDestroy {
     this.originParkingAreaId.set(null);
     this.originParkingOptions.set([]);
     this.destinationInterest.set(null);
+    this.includeAllDestinationEntrances.set(false);
     this.destinationInterestOptions.set([]);
     this.activePickField.set('origin');
   }
@@ -400,6 +403,7 @@ export class Student implements OnInit, OnDestroy {
     this.originParkingAreaId.set(null);
     this.originParkingOptions.set([]);
     this.destinationInterest.set(null);
+    this.includeAllDestinationEntrances.set(false);
     this.destinationInterestOptions.set([]);
     this.routes.set([]);
   }
@@ -421,7 +425,10 @@ export class Student implements OnInit, OnDestroy {
         liveOrigin.longitude,
         to,
         this.selectedTravelMode(),
-        this.destinationInterest()
+        this.destinationInterest(),
+        null,
+        null,
+        this.includeAllDestinationEntrances()
       ).subscribe({
         next: (result) => {
           this.isCalculatingRoute.set(false);
@@ -440,7 +447,8 @@ export class Student implements OnInit, OnDestroy {
       to,
       this.selectedTravelMode(),
       this.originParkingAreaId(),
-      this.destinationInterest()
+      this.destinationInterest(),
+      this.includeAllDestinationEntrances()
     ).subscribe({
       next: (routes: any) => {
         this.isCalculatingRoute.set(false);
@@ -462,6 +470,7 @@ export class Student implements OnInit, OnDestroy {
       if (response?.code === 'DESTINATION_INTEREST_REQUIRED') {
         this.destinationInterestOptions.set(response.interests);
         this.destinationInterest.set(null);
+        this.includeAllDestinationEntrances.set(false);
         this.originParkingAreaId.set(null);
         this.originParkingOptions.set([]);
         return;
@@ -477,6 +486,13 @@ export class Student implements OnInit, OnDestroy {
 
   selectDestinationInterest(interest: string): void {
     this.destinationInterest.set(interest);
+    this.includeAllDestinationEntrances.set(false);
+  }
+
+  selectAllDestinationEntrances(): void {
+    this.destinationInterest.set(null);
+    this.includeAllDestinationEntrances.set(true);
+    this.calculateRoute();
   }
 
   selectOriginParkingArea(parkingAreaId: number): void {
@@ -541,7 +557,8 @@ export class Student implements OnInit, OnDestroy {
       route.travelMode,
       this.destinationInterest(),
       isWalkingLeg ?? null,
-      isWalkingLeg === false ? route.transitionParkingAreaId : null
+      isWalkingLeg === false ? route.transitionParkingAreaId : null,
+      this.includeAllDestinationEntrances()
     ).subscribe({
       next: (result) => {
         result.route.routeGuides = result.routeGuides;

@@ -20,7 +20,8 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
     public async Task<ActionResult<IEnumerable<RouteDto>>> GetRoute(
         [FromQuery] int fromBuildingId, [FromQuery] int toBuildingId,
         [FromQuery] TravelMode mode = TravelMode.Walking, [FromQuery] int? originParkingAreaId = null,
-        [FromQuery] string? destinationInterest = null)
+        [FromQuery] string? destinationInterest = null,
+        [FromQuery] bool includeAllDestinationEntrances = false)
     {
         if (fromBuildingId == toBuildingId)
             return BadRequest("Origin and destination must be different buildings.");
@@ -50,7 +51,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         var hasConfiguredInterests = availableInterests.Count > 0;
         List<Node> toEntrances;
 
-        if (hasConfiguredInterests)
+        if (hasConfiguredInterests && !includeAllDestinationEntrances)
         {
             if (string.IsNullOrWhiteSpace(destinationInterest))
             {
@@ -84,7 +85,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         {
             var parkingCachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
                 fromBuildingId, toBuildingId, mode, originParkingAreaId);
-            if (hasConfiguredInterests)
+            if (hasConfiguredInterests && !includeAllDestinationEntrances)
                 cachedRoutes = cachedRoutes.Concat(parkingCachedRoutes).DistinctBy(route => route.RouteId).ToList();
             else if (cachedRoutes.Count == 0)
                 cachedRoutes = parkingCachedRoutes;
@@ -266,7 +267,7 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         var hasConfiguredInterests = availableInterests.Count > 0;
         List<Node> destinationEntrances;
 
-        if (hasConfiguredInterests)
+        if (hasConfiguredInterests && !request.IncludeAllDestinationEntrances)
         {
             if (string.IsNullOrWhiteSpace(request.DestinationInterest))
                 return Conflict(new DestinationInterestRequiredDto { Interests = availableInterests });

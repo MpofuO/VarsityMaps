@@ -24,7 +24,9 @@
       <span class="text-sm truncate flex-1">
         {{ node.name || 'Unnamed node' }}
         @if (node.buildingId) {
-        <span class="badge badge-warning badge-xs ml-1">Entrance</span>
+        <span class="badge badge-warning badge-xs ml-1">Building Entrance</span>
+        }@else if (node.parkingAreaId) {
+          <span class="badge badge-info badge-xs ml-1">Parking Access</span>
         }
       </span>
       <button class="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 transition-opacity shrink-0"

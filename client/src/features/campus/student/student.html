@@ -144,6 +144,13 @@
                   </button>
                 }
               </div>
+              <button type="button" class="btn btn-outline btn-sm w-full"
+                [disabled]="isCalculatingRoute()" (click)="selectAllDestinationEntrances()">
+                @if (isCalculatingRoute()) {
+                  <span class="loading loading-spinner loading-xs"></span>
+                }
+                Show all available routes
+              </button>
               <button class="btn btn-info btn-sm w-full" [disabled]="destinationInterest() === null || isCalculatingRoute()"
                 (click)="calculateRoute()">
                 @if (isCalculatingRoute()) {

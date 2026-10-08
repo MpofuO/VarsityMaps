@@ -1,1 +1,11 @@
-<div #mapContainer class="w-full h-full rounded-box border border-base-300 shadow-sm overflow-hidden"></div>
+<div class="relative w-full h-full">
+  <div #mapContainer class="w-full h-full rounded-box border border-base-300 shadow-sm overflow-hidden"></div>
+  @if (!isStudent()) {
+  <label
+    class="absolute top-3 right-3 z-10 flex items-center gap-2 rounded-box border border-base-300 bg-base-100/95 px-3 py-2 text-xs shadow-lg backdrop-blur-sm cursor-pointer">
+    <span>Show google labels</span>
+    <input type="checkbox" class="toggle toggle-primary toggle-sm" [checked]="showGoogleLabels()"
+      (change)="toggleGoogleLabels()" />
+  </label>
+  }
+</div>

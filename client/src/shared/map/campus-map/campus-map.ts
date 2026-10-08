@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, ElementRef, ViewChild, effect, input, output, signal } from '@angular/core';
-import { loadGoogleMaps, defaultMapOptions } from '../../../core/functions/load-google-maps';
+import { loadGoogleMaps } from '../../../core/functions/load-google-maps';
 import { MapPolygon, MapMarker, MapPolyline } from '../../../types/map';
 
 const SOUTH_AFRICA_CENTER = { lat: -28.4793, lng: 24.6727 };
@@ -108,6 +108,7 @@ export class CampusMap implements AfterViewInit {
   private readonly renderedMarkers = new Map<number, google.maps.Marker>();
   private readonly renderedPolylines = new Map<number, google.maps.Polyline>();
   private readonly isReady = signal(false);
+  protected readonly showGoogleLabels = signal(false);
 
   constructor() {
     effect(() => this.syncCenter(this.center()));
@@ -128,7 +129,8 @@ export class CampusMap implements AfterViewInit {
       streetViewControl: false,
       fullscreenControl: false,
       disableDoubleClickZoom: true,
-      ...defaultMapOptions(this.isStudent())
+      mapTypeControl: false,
+      mapTypeId: this.isStudent() && this.showGoogleLabels() ? google.maps.MapTypeId.HYBRID : google.maps.MapTypeId.SATELLITE
     });
     this.syncCenter(this.center());
 
@@ -143,6 +145,12 @@ export class CampusMap implements AfterViewInit {
     this.syncPolygons(this.polygons());
     this.syncMarkers(this.markers());
     this.syncPolylines(this.polylines());
+  }
+
+  toggleGoogleLabels(): void {
+    const enabled = !this.showGoogleLabels();
+    this.showGoogleLabels.set(enabled);
+    this.map?.setMapTypeId(enabled ? google.maps.MapTypeId.HYBRID : google.maps.MapTypeId.SATELLITE);
   }
 
   private syncCenter(center: google.maps.LatLngLiteral | null): void {

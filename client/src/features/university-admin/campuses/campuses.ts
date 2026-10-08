@@ -27,8 +27,10 @@ export class Campuses implements OnInit {
   protected readonly isFormOpen = signal(false);
   protected readonly editingCampus = signal<Campus | null>(null);
   protected readonly isPickerOpen = signal(false);
+  protected readonly adminCampus = signal<Campus | null>(null);
   protected readonly campusAdmin = signal<CampusAdminDetails | null>(null);
   protected readonly isLoadingAdmin = signal(false);
+  protected readonly isCampusAdminOpen = signal(false);
   protected readonly isUnassignConfirmOpen = signal(false);
 
   private nameUniqueValidator(): ValidatorFn {
@@ -89,6 +91,7 @@ export class Campuses implements OnInit {
 
   openEdit(campus: Campus): void {
     this.editingCampus.set(campus);
+    this.adminCampus.set(campus);
     this.form.reset({
       name: campus.name,
       alias: campus.alias,
@@ -99,20 +102,38 @@ export class Campuses implements OnInit {
     this.loadCampusAdmin(campus.campusId);
   }
 
+  openCampusAdmin(campus: Campus): void {
+    this.adminCampus.set(campus);
+    this.isCampusAdminOpen.set(true);
+    this.loadCampusAdmin(campus.campusId);
+  }
+
+  closeCampusAdmin(): void {
+    this.isCampusAdminOpen.set(false);
+    this.adminCampus.set(null);
+    this.campusAdmin.set(null);
+    this.isLoadingAdmin.set(false);
+  }
+
   private loadCampusAdmin(campusId: number): void {
     this.campusAdmin.set(null);
     this.isLoadingAdmin.set(true);
     this.campusService.getCampusAdmin(campusId).subscribe({
       next: (admin) => {
+        if (this.adminCampus()?.campusId !== campusId) return;
         this.campusAdmin.set(admin);
         this.isLoadingAdmin.set(false);
       },
-      error: () => this.isLoadingAdmin.set(false)
+      error: () => {
+        if (this.adminCampus()?.campusId === campusId) {
+          this.isLoadingAdmin.set(false);
+        }
+      }
     });
   }
 
   toggleSuspend(): void {
-    const campus = this.editingCampus();
+    const campus = this.adminCampus();
     const admin = this.campusAdmin();
     if (!campus || !admin) return;
 
@@ -134,7 +155,7 @@ export class Campuses implements OnInit {
   }
 
   confirmUnassign(): void {
-    const campus = this.editingCampus();
+    const campus = this.adminCampus();
     if (!campus) return;
 
     this.campusService.unassignAdmin(campus.campusId).subscribe({
@@ -149,6 +170,7 @@ export class Campuses implements OnInit {
   closeForm(): void {
     this.isFormOpen.set(false);
     this.editingCampus.set(null);
+    this.adminCampus.set(null);
     this.campusAdmin.set(null);
   }
 

@@ -4,14 +4,14 @@
       Click anywhere on the map to place a pin, or drag an existing marker to adjust the exact position.
     </p>
     <div class="relative">
-      <input class="input input-bordered input-sm w-full" placeholder="Search for a university to jump there…"
+      <input class="input input-bordered input-sm w-full" placeholder="Search South African cities or provinces…"
         [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
       @if (searchResults().length > 0) {
       <ul
         class="absolute z-20 mt-1 w-full bg-base-100 border border-base-300 rounded-box shadow-lg max-h-48 overflow-y-auto">
         @for (result of searchResults(); track result.name) {
         <li class="px-3 py-2 text-sm cursor-pointer hover:bg-base-200" (click)="selectSearchResult(result)">
-          {{ result.name }}
+          {{ result.name }}, {{ result.province }}
         </li>
         }
       </ul>

@@ -11,7 +11,8 @@ export class NavigationService extends BaseService {
     toBuildingId: number,
     mode: number = 1,
     originParkingAreaId: number | null = null,
-    destinationInterest: string | null = null
+    destinationInterest: string | null = null,
+    includeAllDestinationEntrances = false
   ) {
     const params = new URLSearchParams({
       fromBuildingId: String(fromBuildingId),
@@ -20,6 +21,7 @@ export class NavigationService extends BaseService {
     });
     if (originParkingAreaId !== null) params.set('originParkingAreaId', String(originParkingAreaId));
     if (destinationInterest !== null) params.set('destinationInterest', destinationInterest);
+    if (includeAllDestinationEntrances) params.set('includeAllDestinationEntrances', 'true');
 
     return this.http.get<RouteResult[] | RouteResult>(
       `${this.apiUrl}/navigation/route?${params.toString()}`
@@ -33,13 +35,15 @@ export class NavigationService extends BaseService {
     mode: number,
     destinationInterest: string | null = null,
     isWalkingLeg: boolean | null = null,
-    destinationParkingAreaId: number | null = null
+    destinationParkingAreaId: number | null = null,
+    includeAllDestinationEntrances = false
   ) {
     const body: {
       location: { type: string; coordinates: number[] };
       toBuildingId: number;
       mode: number;
       destinationInterest: string | null;
+      includeAllDestinationEntrances: boolean;
       isWalkingLeg?: boolean;
       destinationParkingAreaId?: number;
     } = {
@@ -49,7 +53,8 @@ export class NavigationService extends BaseService {
       },
       toBuildingId,
       mode,
-      destinationInterest
+      destinationInterest,
+      includeAllDestinationEntrances
     };
     if (isWalkingLeg !== null) body.isWalkingLeg = isWalkingLeg;
     if (destinationParkingAreaId !== null) body.destinationParkingAreaId = destinationParkingAreaId;

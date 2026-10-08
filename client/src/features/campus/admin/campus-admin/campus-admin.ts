@@ -170,27 +170,39 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #endregion
 
   // #region Map Bindings (computed)
-  protected readonly mapPolygons = computed(() => [
-    ...this.buildings().map((b) => ({
-      id: `building-${b.buildingId}`,
-      paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
-      label: b.alias,
-      selected: b.buildingId === this.selectedBuildingId(),
-      clickable: this.mode() !== 'place-nodes' || !b.allowsPassage,
-      strokeColor: '#7c3aed',
-      fillColor: '#8b5cf6'
-    })),
-    ...this.parkingAreas().map((p) => ({
-      id: `parking-${p.parkingAreaId}`,
-      paths: p.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
-      selected: p.parkingAreaId === this.selectedParkingAreaId(),
-      clickable: this.mode() !== 'place-nodes',
-      strokeColor: '#0891b2',
-      fillColor: '#06b6d4'
-    }))
-  ]);
+  protected readonly mapPolygons = computed(() => {
+    const tab = this.activeTab();
+    const buildings = tab === 'buildings' ? this.buildings() : [];
+    const parkingAreas = tab === 'parking-areas' ? this.parkingAreas() : [];
+
+    return [
+      ...buildings.map((b) => ({
+        id: `building-${b.buildingId}`,
+        paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
+        label: b.alias,
+        selected: b.buildingId === this.selectedBuildingId(),
+        clickable: this.mode() !== 'place-nodes' || !b.allowsPassage,
+        strokeColor: '#7c3aed',
+        fillColor: '#8b5cf6'
+      })),
+      ...parkingAreas.map((p) => ({
+        id: `parking-${p.parkingAreaId}`,
+        paths: p.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
+        selected: p.parkingAreaId === this.selectedParkingAreaId(),
+        clickable: this.mode() !== 'place-nodes',
+        strokeColor: '#0891b2',
+        fillColor: '#06b6d4'
+      }))
+    ];
+  });
 
   protected readonly nodeMarkers = computed<MapMarker[]>(() => {
+    const showAllNodes = this.activeTab() === 'nodes' || this.activeTab() === 'paths';
+    const visibleNodes = this.nodes().filter(
+      (node) => showAllNodes || (this.activeTab() === 'buildings' && node.buildingId !== null) 
+                             || (this.activeTab() === 'parking-areas' && node.parkingAreaId !== null) 
+    );
+
     const first = this.connectFirstNodeId();
     const second = this.connectSecondNodeId();
     const connectedToFirst = new Set<number>();
@@ -201,7 +213,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       }
     }
 
-    return this.nodes().map((n) => {
+    return visibleNodes.map((n) => {
       let color = n.buildingId ? '#FF8A3D' : n.parkingAreaId ? '#FFCE1B' : '#16202A';
       if (this.mode() === 'connect-nodes') {
         if (n.nodeId === first || n.nodeId === second) {
@@ -220,6 +232,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   });
 
   protected readonly edgePolylines = computed<MapPolyline[]>(() => {
+    if (this.activeTab() !== 'nodes' && this.activeTab() !== 'paths') return [];
+
     const nodesById = new Map(this.nodes().map((n) => [n.nodeId, n]));
     const propertiesIds = new Set(this.edgePropertiesTarget()?.ids ?? []);
     const selectedId = this.selectedEdgeId();
@@ -262,30 +276,31 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #endregion
 
   // #region Mode & Tab Control
-  switchTab(tab: EditorTab): void {
+  switchTab(tab: EditorTab, afterSwitch?: () => void): void {
     const result = this.canDeactivate();
 
     if (typeof result === 'boolean') {
       if (result) {
-        this.applyTabSwitch(tab);
+        this.applyTabSwitch(tab, afterSwitch);
       }
       return;
     }
 
     result.pipe(take(1)).subscribe((canLeave) => {
       if (canLeave) {
-        this.applyTabSwitch(tab);
+        this.applyTabSwitch(tab, afterSwitch);
       }
     });
   }
 
-  private applyTabSwitch(tab: EditorTab): void {
+  private applyTabSwitch(tab: EditorTab, afterSwitch?: () => void): void {
     this.activeTab.set(tab);
     this.selectedBuildingId.set(null);
     this.selectedParkingAreaId.set(null);
     this.selectedNodeId.set(null);
     this.selectedEdgeId.set(null);
     this.cancelMode();
+    afterSwitch?.();
   }
 
   cancelMode(): void {
@@ -437,8 +452,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       return;
     }
 
-    if (this.activeTab() === 'nodes')
+    if (this.activeTab() === 'paths') {
+      this.switchTab('nodes', () => this.selectNode(nodeId));
+    } else if (this.activeTab() === 'nodes') {
       this.selectNode(nodeId);
+    }
   }
 
   private isPointInAnyBuilding(point: google.maps.LatLngLiteral): boolean {
@@ -476,6 +494,11 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   }
 
   onPolylineClick(edgeId: number): void {
+    if (this.activeTab() === 'nodes') {
+      this.switchTab('paths', () => this.selectEdge(edgeId));
+      return;
+    }
+
     if (this.activeTab() === 'paths') {
       if (this.mode() === 'select-edges') {
         this.toggleEdgeSelection(edgeId);
