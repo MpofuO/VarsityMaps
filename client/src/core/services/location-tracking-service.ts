@@ -90,6 +90,7 @@ export class LocationTrackingService {
         (err) => {
           if (session !== this.trackingSession) return;
           this.requestInFlight = false;
+          if (err.code === 3) return;
           this.errorSubject.next(err.message || 'Unable to retrieve location.');
           if (err.code === 1) {
             this.stopTracking();
@@ -97,7 +98,7 @@ export class LocationTrackingService {
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 30000,
           maximumAge: 0
         }
       );

@@ -684,7 +684,12 @@ export class Student implements OnInit, OnDestroy {
 
     const distanceToRoute = this.distanceFromRoute(loc, active.path.coordinates);
     const deviationThreshold = Math.max(15, Math.min(35, (loc.accuracy ?? 0) * 1.5));
-    if (this.isOffRoute()) {
+    if (this.isLocationInsideBuilding(loc)) {
+      this.deviationSamples = 0;
+      this.onRouteSamples = 0;
+      this.isOffRoute.set(false);
+      this.showDeviationPrompt.set(false);
+    } else if (this.isOffRoute()) {
       this.remainingRouteDistance.set(Math.round(this.routeDistanceFromLocation(loc, active.path.coordinates)));
       this.onRouteSamples = distanceToRoute < deviationThreshold * 0.6 ? this.onRouteSamples + 1 : 0;
       if (this.onRouteSamples >= 2) {
@@ -714,18 +719,19 @@ export class Student implements OnInit, OnDestroy {
 
     if (guides.length > 0) {
       let currentIndex = this.activeGuideIndex();
-      const nextGuide = guides[currentIndex + 1];
+      const routeProgress = this.routeProgressAtLocation(loc, active.path.coordinates);
 
-      if (nextGuide) {
-        const [guideLng, guideLat] = nextGuide.location.coordinates;
-        const distanceToNextGuide = this.haversine(loc.latitude, loc.longitude, guideLat, guideLng);
-
-        if (distanceToNextGuide < 5) {
-          currentIndex++;
-          this.activeGuideIndex.set(currentIndex);
-        }
+      while (currentIndex + 1 < guides.length) {
+        const [guideLng, guideLat] = guides[currentIndex + 1].location.coordinates;
+        const guideProgress = this.routeProgressAtLocation(
+          { latitude: guideLat, longitude: guideLng },
+          active.path.coordinates
+        );
+        if (guideProgress > routeProgress + 5) break;
+        currentIndex++;
       }
 
+      this.activeGuideIndex.set(currentIndex);
       this.currentInstruction.set(guides[currentIndex].instruction);
 
       this.remainingRouteDistance.set(Math.round(this.routeDistanceFromLocation(loc, active.path.coordinates)));
@@ -733,6 +739,24 @@ export class Student implements OnInit, OnDestroy {
       this.currentInstruction.set(`Navigating towards ${this.destinationBuilding()?.name || 'Destination'}`);
       this.remainingRouteDistance.set(Math.round(distanceToDest));
     }
+  }
+
+  private isLocationInsideBuilding(loc: LocationCoordinates): boolean {
+    return this.buildings().some((building) => {
+      const ring = building.boundary.coordinates[0];
+      let inside = false;
+
+      for (let current = 0, previous = ring.length - 1; current < ring.length; previous = current++) {
+        const [currentLng, currentLat] = ring[current];
+        const [previousLng, previousLat] = ring[previous];
+        const intersects = (currentLat > loc.latitude) !== (previousLat > loc.latitude) &&
+          loc.longitude < (previousLng - currentLng) * (loc.latitude - currentLat) /
+            (previousLat - currentLat) + currentLng;
+        if (intersects) inside = !inside;
+      }
+
+      return inside;
+    });
   }
 
   private distanceFromRoute(loc: LocationCoordinates, coordinates: [number, number][]): number {
@@ -795,6 +819,40 @@ export class Student implements OnInit, OnDestroy {
     }
 
     return remainingDistance;
+  }
+
+  private routeProgressAtLocation(loc: LocationCoordinates, coordinates: [number, number][]): number {
+    if (coordinates.length < 2) return 0;
+
+    let nearestDistance = Infinity;
+    let progress = 0;
+    let distanceAlongRoute = 0;
+
+    for (let index = 0; index < coordinates.length - 1; index++) {
+      const start = coordinates[index];
+      const end = coordinates[index + 1];
+      const projection = this.projectOntoSegment(loc, start, end);
+      const distanceToProjection = this.haversine(
+        loc.latitude,
+        loc.longitude,
+        projection[1],
+        projection[0]
+      );
+
+      if (distanceToProjection < nearestDistance) {
+        nearestDistance = distanceToProjection;
+        progress = distanceAlongRoute + this.haversine(
+          start[1],
+          start[0],
+          projection[1],
+          projection[0]
+        );
+      }
+
+      distanceAlongRoute += this.haversine(start[1], start[0], end[1], end[0]);
+    }
+
+    return progress;
   }
 
   private projectOntoSegment(
