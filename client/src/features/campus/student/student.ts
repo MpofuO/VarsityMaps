@@ -6,12 +6,13 @@ import { NavigationService } from '../../../core/services/navigation-service';
 import { ToastService } from '../../../core/services/toast-service';
 import { Building } from '../../../types/building';
 import { CampusMap } from '../../../shared/map/campus-map/campus-map';
+import { Modal } from '../../../shared/modal/modal';
 import { MapMarker, MapPolygon, MapPolyline } from '../../../types/map';
 import { RouteResult } from '../../../types/route-result';
 import { DecimalPipe } from '@angular/common';
 import { CampusService } from '../../../core/services/campus-service';
 import { TravelMode } from '../../../types/edge';
-import { LocationCoordinates, LocationTrackingService } from '../../../core/services/location-tracking-service';
+import { LocationCoordinates, LocationTrackingMode, LocationTrackingService } from '../../../core/services/location-tracking-service';
 import { RouteGuide } from '../../../types/route-guide';
 import { OriginParkingRequired, ParkingAreaOption } from '../../../types/parking-area';
 import { DestinationInterestRequired } from '../../../types/destination-interest-required';
@@ -21,7 +22,7 @@ type PickField = 'origin' | 'destination' | null;
 @Component({
   selector: 'app-student',
   standalone: true,
-  imports: [CampusMap, DecimalPipe],
+  imports: [CampusMap, DecimalPipe, Modal],
   templateUrl: './student.html',
   styleUrl: './student.css'
 })
@@ -42,6 +43,7 @@ export class Student implements OnInit, OnDestroy {
   protected readonly isPlanningRoute = signal(false);
   protected readonly isNavigating = signal(false);
   protected readonly showEndConfirmModal = signal(false);
+  protected readonly showArrivalModal = signal(false);
 
   protected readonly currentLocation = signal<LocationCoordinates | null>(null);
   protected readonly originLocation = signal<LocationCoordinates | null>(null);
@@ -501,7 +503,7 @@ export class Student implements OnInit, OnDestroy {
     if (parkingArea) this.centerMapOnBoundsIfNeeded(parkingArea.boundary.coordinates[0], true);
   }
 
-  startNavigation(): void {
+  startNavigation(mode: LocationTrackingMode = 'live'): void {
     const route = this.activeRoute();
     if (!route) return;
 
@@ -517,7 +519,7 @@ export class Student implements OnInit, OnDestroy {
       this.checkInitialDeviation = true;
       this.isNavigating.set(true);
       this.isPlanningRoute.set(false);
-      this.locationService.startTracking();
+      this.locationService.startTracking(route, mode);
     };
 
     if (route.routeGuides) {
@@ -536,10 +538,19 @@ export class Student implements OnInit, OnDestroy {
     this.currentInstruction.set('Return to the highlighted route to resume guidance.');
   }
 
+  simulateMockDeviation(): void {
+    this.locationService.simulateMockDeviation();
+  }
+
+  returnMockToRoute(): void {
+    this.locationService.returnMockToRoute();
+  }
+
   recalculateRoute(isWalkingLeg?: boolean): void {
     const location = this.currentLocation();
     const route = this.activeRoute();
     if (!location || !route || this.isRecalculating()) return;
+    const trackingMode: LocationTrackingMode = this.locationService.isMocking() ? 'mock' : 'live';
 
     const hasVehicleAndWalkingLegs =
       route.transitionParkingAreaId !== null &&
@@ -576,7 +587,7 @@ export class Student implements OnInit, OnDestroy {
         this.checkInitialDeviation = true;
         this.originLocation.set(location);
         this.updateUserMarker(location);
-        this.locationService.startTracking();
+        this.locationService.startTracking(result.route, trackingMode);
         this.isRecalculating.set(false);
       },
       error: (error) => {
@@ -599,6 +610,10 @@ export class Student implements OnInit, OnDestroy {
   confirmEndNavigation(): void {
     this.showEndConfirmModal.set(false);
     this.endNavigationSession();
+  }
+
+  closeArrivalModal(): void {
+    this.showArrivalModal.set(false);
   }
 
   private endNavigationSession(): void {
@@ -686,8 +701,8 @@ export class Student implements OnInit, OnDestroy {
     }
 
     if (distanceToDest < 3) {
+      this.showArrivalModal.set(true);
       this.endNavigationSession();
-      alert('You have arrived at your destination!');
       return;
     }
 
