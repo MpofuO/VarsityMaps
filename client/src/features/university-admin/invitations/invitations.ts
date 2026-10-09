@@ -9,7 +9,7 @@ import { Campus } from '../../../types/campus';
 import { Modal } from '../../../shared/modal/modal';
 import { TextInput } from '../../../shared/text-input/text-input';
 import { SelectInput } from '../../../shared/select-input/select-input';
-import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import { DatePipe } from '@angular/common';
 
 export type InvitationStatusFilter = 'all' | 'pending' | 'accepted' | 'declined' | 'expired' | 'locked' | 'revoked';
@@ -112,39 +112,27 @@ export class Invitations implements OnInit {
   }
 
   private load(): void {
-    this.invitationService.getInvitations().subscribe({
-      next: (invitations) => this.invitations.set(invitations),
-      error: (error) => {
-        this.toastService.requestError(error, 'Unable to load invitations.');
-      }
-    });
-
-    this.campusService.getCampuses().pipe(
-      switchMap(campuses => {
-        if (!campuses || campuses.length === 0) return of([]);
-
-        const adminChecks$ = campuses.map(campus =>
-          this.campusService.getCampusAdmin(campus.campusId).pipe(
-            map(admin => ({ campus, hasAdmin: admin !== null && admin !== undefined })),
-            catchError(error => error.status === 400 || error.status === 0
-              ? throwError(() => error)
-              : of({ campus, hasAdmin: false }))
+    forkJoin({
+      invitations: this.invitationService.getInvitations(),
+      campuses: this.campusService.getCampuses()
+    }).subscribe({
+      next: ({ invitations, campuses }) => {
+        const universityId = this.accountService.currentUser()?.universityId;
+        this.invitations.set(invitations);
+        this.campuses.set(campuses.filter(campus =>
+          campus.universityId === universityId &&
+          !invitations.some(invitation =>
+            invitation.campusId === campus.campusId &&
+            !invitation.isAccepted &&
+            !invitation.isRevoked &&
+            !invitation.isRejected &&
+            !invitation.isExpired &&
+            !invitation.isLocked
           )
-        );
-
-        return forkJoin(adminChecks$);
-      }),
-      map(results =>
-        results.filter(r => !r.hasAdmin
-          && !this.invitations().some(i => i.campusId === r.campus.campusId &&
-            !i.isExpired && !i.isRejected && !i.isRevoked))
-          .map(r => r.campus)
-      )
-    ).subscribe({
-      next: (availableCampuses) => this.campuses.set(availableCampuses),
+        ));
+      },
       error: (error) => {
-        console.error('Error fetching campuses', error);
-        this.toastService.requestError(error, 'Unable to load campuses for invitations.');
+        this.toastService.requestError(error, 'Unable to load invitations and campuses.');
       }
     });
   }

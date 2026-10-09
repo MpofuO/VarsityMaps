@@ -16,4 +16,5 @@ public class RouteDto
     public Point? TransitionLocation { get; set; }
     public int? OriginParkingAreaId { get; set; }
     public Point? OriginParkingLocation { get; set; }
+    public List<RouteGuideDto>? RouteGuides { get; set; }
 }

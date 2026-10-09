@@ -9,9 +9,9 @@
       @if (searchResults().length > 0) {
       <ul
         class="absolute z-20 mt-1 w-full bg-base-100 border border-base-300 rounded-box shadow-lg max-h-48 overflow-y-auto">
-        @for (result of searchResults(); track result.name) {
+        @for (result of searchResults(); track result.name + result.latitude + result.longitude) {
         <li class="px-3 py-2 text-sm cursor-pointer hover:bg-base-200" (click)="selectSearchResult(result)">
-          {{ result.name }}, {{ result.province }}
+          {{ result.name }}{{ result.description ? ', ' + result.description : '' }}
         </li>
         }
       </ul>

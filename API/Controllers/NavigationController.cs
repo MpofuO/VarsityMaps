@@ -78,17 +78,17 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
             toEntrances = allDestinationEntrances;
         }
 
-        var cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
-            fromBuildingId, toBuildingId, mode, null);
-
-        if (originParkingAreaId is not null)
+        var cachedRoutes = new List<Route>();
+        if (!hasConfiguredInterests)
         {
-            var parkingCachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
-                fromBuildingId, toBuildingId, mode, originParkingAreaId);
-            if (hasConfiguredInterests && !includeAllDestinationEntrances)
-                cachedRoutes = cachedRoutes.Concat(parkingCachedRoutes).DistinctBy(route => route.RouteId).ToList();
-            else if (cachedRoutes.Count == 0)
-                cachedRoutes = parkingCachedRoutes;
+            cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
+                fromBuildingId, toBuildingId, mode, null);
+
+            if (originParkingAreaId is not null && cachedRoutes.Count == 0)
+            {
+                cachedRoutes = await uow.RouteRepository.GetByBuildingsWithGuidesAsync(
+                    fromBuildingId, toBuildingId, mode, originParkingAreaId);
+            }
         }
 
         if (!hasConfiguredInterests && cachedRoutes.Count > 0)
@@ -197,24 +197,6 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
         var responseRoutes = new List<Route>();
         foreach (var route in routes)
         {
-            if (hasConfiguredInterests)
-            {
-                var matchingCachedRoute = cachedRoutes.FirstOrDefault(cachedRoute =>
-                    cachedRoute.FromNodeId == route.FromNodeId &&
-                    cachedRoute.ToNodeId == route.ToNodeId &&
-                    cachedRoute.OriginParkingAreaId == routeOriginParkingAreaId &&
-                    cachedRoute.TransitionNodeId == route.TransitionNodeId &&
-                    cachedRoute.TransitionParkingAreaId == route.TransitionParkingAreaId);
-
-                if (matchingCachedRoute is not null)
-                {
-                    matchingCachedRoute.SearchCount++;
-                    matchingCachedRoute.LastRetrieved = DateTime.UtcNow;
-                    responseRoutes.Add(matchingCachedRoute);
-                    continue;
-                }
-            }
-
             route.FromBuildingId = fromBuildingId;
             route.ToBuildingId = toBuildingId;
             route.CampusId = campusId;
@@ -229,13 +211,33 @@ public class NavigationController(UserManager<AppUser> userManager, IUnitOfWork 
             route.SearchCount = 1;
             route.LastRetrieved = DateTime.UtcNow;
 
-            await uow.RouteRepository.CreateAsync(route);
+            if (!hasConfiguredInterests)
+                await uow.RouteRepository.CreateAsync(route);
             responseRoutes.Add(route);
         }
 
-        await uow.CompleteAsync();
+        if (!hasConfiguredInterests)
+            await uow.CompleteAsync();
 
-        return Ok(responseRoutes.Select(route => route.ToDto()));
+        var routeDtos = new List<RouteDto>();
+        foreach (var route in responseRoutes)
+        {
+            var routeDto = route.ToDto();
+            if (hasConfiguredInterests)
+            {
+                string? parkingAreaName = null;
+                if (route.TransitionParkingAreaId is int parkingAreaId)
+                {
+                    parkingAreaName = (await uow.ParkingAreaRepository.GetByIdAsync(parkingAreaId))?.Name;
+                }
+
+                routeDto.RouteGuides = routeService.GetRouteGuides(route, parkingAreaName);
+            }
+
+            routeDtos.Add(routeDto);
+        }
+
+        return Ok(routeDtos);
     }
 
     [HttpPost("live-route")]

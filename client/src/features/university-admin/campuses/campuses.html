@@ -188,4 +188,5 @@
 </app-modal>
 
 <app-coordinate-picker [isOpen]="isPickerOpen()" [initialLatitude]="form.controls.latitude.value"
-  [initialLongitude]="form.controls.longitude.value" (picked)="onLocationPicked($event)" (closed)="closePicker()" />
+  [initialLongitude]="form.controls.longitude.value" [suggestions]="locationSuggestions()"
+  (picked)="onLocationPicked($event)" (closed)="closePicker()" />

@@ -9,6 +9,8 @@ import { TextInput } from '../../../shared/text-input/text-input';
 import { CoordinatePicker } from '../../../shared/map/coordinate-picker/coordinate-picker';
 import { DecimalPipe } from '@angular/common';
 import { CampusAdminDetails } from '../../../types/campus-admin-details';
+import { UniversityLookupService } from '../../../core/services/university-lookup-service';
+import { LocationSuggestion } from '../../../shared/map/coordinate-picker/coordinate-picker';
 
 @Component({
   selector: 'app-campuses',
@@ -19,11 +21,13 @@ import { CampusAdminDetails } from '../../../types/campus-admin-details';
 })
 export class Campuses implements OnInit {
   private readonly campusService = inject(CampusService);
+  private readonly universityLookupService = inject(UniversityLookupService);
   private readonly accountService = inject(AccountService);
   private readonly toastService = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly campuses = signal<Campus[] | null>(null);
+  protected readonly locationSuggestions = signal<LocationSuggestion[]>([]);
   protected readonly isFormOpen = signal(false);
   protected readonly editingCampus = signal<Campus | null>(null);
   protected readonly isPickerOpen = signal(false);
@@ -70,6 +74,20 @@ export class Campuses implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadLocationSuggestions();
+  }
+
+  private loadLocationSuggestions(): void {
+    this.universityLookupService.getAll().subscribe({
+      next: (lookups) => this.locationSuggestions.set(lookups.map(lookup => ({
+        name: lookup.name,
+        latitude: lookup.latitude,
+        longitude: lookup.longitude
+      }))),
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load location suggestions.');
+      }
+    });
   }
 
   private load(): void {
