@@ -87,6 +87,7 @@ export class CampusMap implements AfterViewInit {
   markers = input<MapMarker[]>([]);
   polylines = input<MapPolyline[]>([]);
   isStudent = input<boolean>(false);
+  placingPathNodes = input<boolean>(false);
 
   mapClick = output<google.maps.LatLng>();
   polygonClick = output<string>();
@@ -115,6 +116,7 @@ export class CampusMap implements AfterViewInit {
     effect(() => this.syncPolygons(this.polygons()));
     effect(() => this.syncMarkers(this.markers()));
     effect(() => this.syncPolylines(this.polylines()));
+    effect(() => this.syncMapCursor());
   }
 
   async ngAfterViewInit(): Promise<void> {
@@ -151,6 +153,21 @@ export class CampusMap implements AfterViewInit {
     const enabled = !this.showGoogleLabels();
     this.showGoogleLabels.set(enabled);
     this.map?.setMapTypeId(enabled ? google.maps.MapTypeId.HYBRID : google.maps.MapTypeId.SATELLITE);
+  }
+
+  private syncMapCursor(): void {
+    const isPlacingPathNodes = this.placingPathNodes();
+
+    if (this.mapContainer) {
+      this.mapContainer.nativeElement.style.cursor = isPlacingPathNodes ? 'crosshair' : 'default';
+    }
+
+    if (this.map) {
+      this.map.setOptions({
+        draggableCursor: isPlacingPathNodes ? 'crosshair' : 'grab',
+        draggingCursor: isPlacingPathNodes ? 'crosshair' : 'grabbing'
+      });
+    }
   }
 
   private syncCenter(center: google.maps.LatLngLiteral | null): void {

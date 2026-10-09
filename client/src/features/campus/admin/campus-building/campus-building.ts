@@ -28,6 +28,7 @@ export class CampusBuilding {
 
   protected isFormOpen = false;
   protected editingBuilding: Building | null = null;
+  protected isPassageConfirmOpen = false;
   protected isDeleteOpen = false;
   protected targetBuilding: Building | null = null;
 
@@ -118,6 +119,27 @@ export class CampusBuilding {
   closeForm(): void {
     this.isFormOpen = false;
     this.editingBuilding = null;
+    this.isPassageConfirmOpen = false;
+  }
+
+  onAllowsPassageChange(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    if (this.editingBuilding?.allowsPassage && !checkbox.checked) {
+      checkbox.checked = this.form.controls.allowsPassage.value;
+      this.isPassageConfirmOpen = true;
+      return;
+    }
+
+    this.form.controls.allowsPassage.setValue(checkbox.checked);
+  }
+
+  confirmDisallowPassage(): void {
+    this.form.controls.allowsPassage.setValue(false);
+    this.isPassageConfirmOpen = false;
+  }
+
+  cancelDisallowPassage(): void {
+    this.isPassageConfirmOpen = false;
   }
 
   submit(): void {

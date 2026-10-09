@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using NetTopologySuite.Geometries;
 
 namespace API.Controllers;
 
@@ -63,6 +64,27 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
             existingParkingAreas.Any(p => p.Boundary.Intersects(buildingDto.Boundary)))
             return BadRequest("This building's outline overlaps an existing building or parking area.");
 
+        if (!buildingDto.AllowsPassage)
+        {
+            var edges = await uow.EdgeRepository.GetByCampusAsync(campusId);
+            var crossingEdges = edges
+                .Where(edge => buildingDto.Boundary.Intersects(new LineString([
+                    edge.FromNode.Location.Coordinate,
+                    edge.ToNode.Location.Coordinate
+                ])))
+                .Select(edge => new { edge.EdgeId, edge.Name })
+                .ToList();
+
+            if (crossingEdges.Count > 0)
+            {
+                return Conflict(new
+                {
+                    code = "building-path-conflict",
+                    edges = crossingEdges
+                });
+            }
+        }
+
         var building = new Building
         {
             Name = buildingDto.Name,
@@ -75,6 +97,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         };
 
         await uow.BuildingRepository.CreateAsync(building);
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add building.");
         return Ok(building.ToDto());
     }
@@ -98,6 +121,19 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         existingBuilding = await uow.BuildingRepository.GetByAliasAsync(callerCampusId, buildingDto.Alias);
         if (existingBuilding != null && existingBuilding.BuildingId != building.BuildingId) return BadRequest("A building with this alias already exists.");
 
+        if (building.AllowsPassage && !buildingDto.AllowsPassage)
+        {
+            var edges = await uow.EdgeRepository.GetByCampusAsync(callerCampusId);
+            var crossingEdges = edges.Where(edge =>
+                building.Boundary.Intersects(new LineString([
+                    edge.FromNode.Location.Coordinate,
+                    edge.ToNode.Location.Coordinate
+                ])));
+
+            foreach (var edge in crossingEdges)
+                await uow.EdgeRepository.DeleteAsync(edge);
+        }
+
         building.Name = buildingDto.Name;
         building.Alias = buildingDto.Alias;
         building.IsAccessible = buildingDto.IsGuestAccessible ? true : buildingDto.IsAccessible;
@@ -105,6 +141,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         building.AllowsPassage = buildingDto.AllowsPassage;
 
         await uow.BuildingRepository.UpdateAsync(building);
+        await uow.RouteRepository.DeleteByCampusAsync(callerCampusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update building.");
         return Ok(building.ToDto());
     }
@@ -126,6 +163,7 @@ public class BuildingController(UserManager<AppUser> userManager, IUnitOfWork uo
         }
 
         await uow.BuildingRepository.DeleteAsync(building);
+        await uow.RouteRepository.DeleteByCampusAsync(callerCampusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to delete building.");
         return Ok();
     }

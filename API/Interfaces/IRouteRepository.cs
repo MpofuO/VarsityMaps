@@ -9,4 +9,5 @@ public interface IRouteRepository : IBaseRepository<Route>
     Task<List<Route>> GetByBuildingsWithGuidesAsync(int fromBuildingId, int toBuildingId, TravelMode mode, int? originParkingAreaId);
     Task<Route?> GetWithRouteGuidesAsync(int routeId);
     Task DeleteByBuildingAsync(int buildingId);
+    Task DeleteByCampusAsync(int campusId);
 }

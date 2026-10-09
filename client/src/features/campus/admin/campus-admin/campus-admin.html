@@ -84,11 +84,11 @@
     <!-- Persistent Map View -->
     <div class="relative w-full h-full min-h-0">
       <app-campus-map [polygons]="mapPolygons()" [markers]="nodeMarkers()" [polylines]="edgePolylines()"
-        [center]="campus()?.center! | toLatLngPipe" (mapClick)="onMapClick($event)"
-        (polygonClick)="onPolygonClick($event)" (polygonDblClick)="onPolygonDblClick($event)"
-        (markerClick)="onMarkerClick($event)" (markerDblClick)="onMarkerDblClick($event)"
-        (polylineClick)="onPolylineClick($event)" (polylineDblClick)="onPolylineDblClick($event)"
-        (ready)="onMapReady($event)" />
+        [center]="campus()?.center! | toLatLngPipe" [placingPathNodes]="mode() === 'place-nodes'"
+        (mapClick)="onMapClick($event)" (polygonClick)="onPolygonClick($event)"
+        (polygonDblClick)="onPolygonDblClick($event)" (markerClick)="onMarkerClick($event)"
+        (markerDblClick)="onMarkerDblClick($event)" (polylineClick)="onPolylineClick($event)"
+        (polylineDblClick)="onPolylineDblClick($event)" (ready)="onMapReady($event)" />
 
       <!-- Drawing & Action Controls Overlay -->
       @if (mode() === 'draw-building') {
@@ -115,10 +115,13 @@
       }
 
       @if (mode() === 'draw-parking-area') {
-      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
-        <span class="text-xs font-medium">Click map to place boundary points ({{ draftPath().length }} placed; 3 minimum)</span>
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
+        <span class="text-xs font-medium">Click map to place boundary points ({{ draftPath().length }} placed; 3
+          minimum)</span>
         <div class="divider divider-horizontal my-0 py-1"></div>
-        <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftPath().length < 3" (click)="finishDrawing()">Finish Shape</button>
+        <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftPath().length < 3"
+          (click)="finishDrawing()">Finish Shape</button>
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
       </div>
       }
@@ -126,7 +129,8 @@
       @if (mode() === 'place-nodes') {
       <div
         class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
-        <span class="text-xs font-medium">{{ draftNodePath().length }} point(s) - you can click an existing node to finish and
+        <span class="text-xs font-medium">{{ draftNodePath().length }} point(s) - you can click an existing node to
+          finish and
           connect</span>
         <button class="btn btn-xs btn-primary rounded-full px-3" [disabled]="draftNodePath().length < 2"
           (click)="finishPlacingNodes()">Finish</button>
@@ -158,14 +162,16 @@
       }
 
       @if (mode() === 'place-parking-access') {
-      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10">
         <span class="text-xs font-medium">Click within 5m of {{ parkingAccessTarget()?.name }}'s boundary</span>
         <button class="btn btn-xs btn-ghost rounded-full" (click)="cancelMode()">Cancel</button>
       </div>
       }
 
       @if (mode() === 'select-path-range') {
-      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
+      <div
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-2xl px-5 py-2.5 z-10 animate-fade-in">
         @if (rangeStartNodeId() === null) {
         <span class="text-xs font-medium">Select the starting node</span>
         } @else {
@@ -217,7 +223,8 @@
     <div class="form-control">
       <label class="label flex-col items-start gap-1 mb-1">
         <span class="label-text font-medium">Closed Until</span>
-        <span class="label-text-alt text-base-content/60">Leave empty if the closure duration is indefinite or permanent.</span>
+        <span class="label-text-alt text-base-content/60">Leave empty if the closure duration is indefinite or
+          permanent.</span>
       </label>
       <input type="date" class="input input-bordered w-full" [value]="propertiesClosedUntil()"
         (input)="propertiesClosedUntil.set($any($event.target).value)" />
@@ -230,11 +237,9 @@
       </label>
       <div class="flex flex-wrap gap-2 pt-1" [class.opacity-50]="propertiesIsClosed()">
         @for (opt of travelModeOptions; track opt.value) {
-        <button type="button" class="btn btn-xs rounded-full px-3 py-1"
-          [disabled]="propertiesIsClosed()"
+        <button type="button" class="btn btn-xs rounded-full px-3 py-1" [disabled]="propertiesIsClosed()"
           [class.btn-primary]="propertiesTravelModes().has(opt.value)"
-          [class.btn-outline]="!propertiesTravelModes().has(opt.value)" 
-          (click)="toggleTravelMode(opt.value)">
+          [class.btn-outline]="!propertiesTravelModes().has(opt.value)" (click)="toggleTravelMode(opt.value)">
           {{ opt.label }}
         </button>
         }
@@ -285,14 +290,58 @@
   </div>
 </app-modal>
 
-<app-modal [isOpen]="isParkingAccessConfirmOpen()" title="Add parking access node" (closed)="isParkingAccessConfirmOpen.set(false)">
+<app-modal [isOpen]="isParkingAccessConfirmOpen()" title="Add parking access node"
+  (closed)="isParkingAccessConfirmOpen.set(false)">
   <div class="space-y-4">
-    <p class="text-sm">Add an access node here for <span class="font-semibold">{{ parkingAccessTarget()?.name }}</span>?</p>
+    <p class="text-sm">Add an access node here for <span class="font-semibold">{{ parkingAccessTarget()?.name }}</span>?
+    </p>
     <input class="input input-bordered input-sm w-full" placeholder="Access node name (e.g. Main Entrance)"
       [value]="parkingAccessName()" (input)="parkingAccessName.set($any($event.target).value)" />
     <div class="modal-action">
       <button type="button" class="btn btn-ghost btn-sm" (click)="cancelMode()">Cancel</button>
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!parkingAccessName().trim()" (click)="confirmParkingAccessNode()">Add access node</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!parkingAccessName().trim()"
+        (click)="confirmParkingAccessNode()">Add access node</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="isBuildingPathConflictOpen()" title="Building overlaps existing paths"
+  (closed)="restartBuildingDrawing()">
+  <div class="space-y-4">
+    <p class="text-sm">This building does not allow passage and overlaps these paths. The paths are highlighted on the
+      map.</p>
+    <ul class="list-disc pl-5 text-sm">
+      @for (edge of conflictingEdges(); track edge.edgeId) {
+      <li>{{ edge.name || 'Path ' + edge.edgeId }}</li>
+      }
+    </ul>
+    <p class="text-sm">Choose how to resolve the conflict:</p>
+    <div class="modal-action flex-wrap">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="restartBuildingDrawing()">Restart drawing</button>
+      <button type="button" class="btn btn-outline btn-sm" (click)="allowPassageAndSaveBuilding()">Allow passage and
+        save</button>
+      <button type="button" class="btn btn-error btn-sm text-white" (click)="deleteConflictingPathsAndSaveBuilding()">
+        Delete paths and save
+      </button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="isPathBuildingConflictOpen()" title="Path crosses a building" (closed)="restartPathDrawing()">
+  <div class="space-y-4">
+    <p class="text-sm">This path crosses buildings that do not allow passage. The buildings are highlighted on the map.
+    </p>
+    <ul class="list-disc pl-5 text-sm">
+      @for (building of conflictingBuildings(); track building.buildingId) {
+      <li>{{ building.name }} ({{ building.alias }})</li>
+      }
+    </ul>
+    <p class="text-sm">Allowing passage changes the setting for the listed building(s).</p>
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="restartPathDrawing()">Restart path</button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="allowPassageAndRetryPath()">
+        Allow passage and retry
+      </button>
     </div>
   </div>
 </app-modal>
@@ -303,7 +352,8 @@
     <p class="text-sm">You have unsaved work in the campus editor - leave without saving?</p>
     <div class="modal-action">
       <button type="button" class="btn btn-ghost btn-sm" (click)="cancelLeave()">Stay</button>
-      <button type="button" class="btn btn-error btn-sm text-error-content" (click)="confirmLeave()">Leave without saving</button>
+      <button type="button" class="btn btn-error btn-sm text-error-content" (click)="confirmLeave()">Leave without
+        saving</button>
     </div>
   </div>
 </app-modal>

@@ -44,8 +44,23 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         // Only block edges that intersect buildings which DO NOT allow passage.
         // Buildings with AllowsPassage = true and all ParkingAreas are allowed.
         var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
-        if (buildings.Any(b => !b.AllowsPassage && b.Boundary.Intersects(segment)))
-            return BadRequest("This path crosses a building that does not allow passage — adjust the route.");
+        var blockingBuildings = buildings
+            .Where(building => !building.AllowsPassage && building.Boundary.Intersects(segment))
+            .Select(building => new
+            {
+                building.BuildingId,
+                building.Name,
+                building.Alias
+            })
+            .ToList();
+        if (blockingBuildings.Count > 0)
+        {
+            return Conflict(new
+            {
+                code = "path-building-conflict",
+                buildings = blockingBuildings
+            });
+        }
 
         var degreeDistance = fromNode.Location.Distance(toNode.Location);
 
@@ -58,6 +73,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         };
 
         await uow.EdgeRepository.CreateAsync(edge);
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add edge.");
         return Ok(edge.ToDto());
     }
@@ -77,6 +93,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         edge.TravelModes = dto.TravelModes;
 
         await uow.EdgeRepository.UpdateAsync(edge);
+        await uow.RouteRepository.DeleteByCampusAsync(callerCampusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update path.");
         return Ok(edge.ToDto());
     }
@@ -104,6 +121,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
             await uow.EdgeRepository.UpdateAsync(edge);
         }
 
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update paths.");
         return Ok(edges.Select(e => e.ToDto()));
     }
@@ -115,6 +133,7 @@ public class EdgeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         if (edge is null) return BadRequest("Edge not found.");
 
         await uow.EdgeRepository.DeleteAsync(edge);
+        await uow.RouteRepository.DeleteByCampusAsync(edge.CampusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to delete edge.");
         return Ok();
     }

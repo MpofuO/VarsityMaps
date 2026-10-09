@@ -41,4 +41,12 @@ public class RouteRepository : BaseRepository<Route>, IRouteRepository
             .ToListAsync();
         context.Routes.RemoveRange(routes);
     }
+
+    public async Task DeleteByCampusAsync(int campusId)
+    {
+        var routes = await context.Routes
+            .Where(r => r.CampusId == campusId)
+            .ToListAsync();
+        context.Routes.RemoveRange(routes);
+    }
 }

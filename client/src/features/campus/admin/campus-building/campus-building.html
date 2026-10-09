@@ -90,7 +90,12 @@
         <span class="text-sm">Guest Accessible</span>
       </label>
       <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" class="toggle toggle-primary toggle-sm" formControlName="allowsPassage" />
+        <input
+          type="checkbox"
+          class="toggle toggle-primary toggle-sm"
+          [checked]="form.controls.allowsPassage.value"
+          (change)="onAllowsPassageChange($event)"
+        />
         <span class="text-sm">Allows Passage</span>
       </label>
     </div>
@@ -108,6 +113,20 @@
       </button>
     </div>
   </form>
+</app-modal>
+
+<app-modal [isOpen]="isPassageConfirmOpen" title="Disallow passage?" (closed)="cancelDisallowPassage()">
+  <div class="space-y-4 pt-2">
+    <p class="text-sm">
+      Any existing paths that cross this building will be deleted when you save. This cannot be undone.
+    </p>
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="cancelDisallowPassage()">Keep passage allowed</button>
+      <button type="button" class="btn btn-error btn-sm text-white" (click)="confirmDisallowPassage()">
+        Disallow and delete paths
+      </button>
+    </div>
+  </div>
 </app-modal>
 
 <app-modal [isOpen]="isDeleteOpen" title="Delete building" (closed)="isDeleteOpen = false">

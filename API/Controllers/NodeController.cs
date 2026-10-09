@@ -84,6 +84,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         };
 
         await uow.NodeRepository.CreateAsync(node);
+        await uow.RouteRepository.DeleteByCampusAsync(callerCampusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add parking access node.");
         return Ok(node.ToDto());
     }
@@ -114,11 +115,26 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         }
 
         var buildings = await uow.BuildingRepository.GetByCampusAsync(campusId);
+        var blockingBuildings = new HashSet<Building>();
         for (var i = 0; i < points.Count - 1; i++)
         {
             var segment = new LineString(new[] { points[i].Coordinate, points[i + 1].Coordinate });
-            if (buildings.Any(b => !b.AllowsPassage && b.Boundary.Intersects(segment)))
-                return BadRequest("A path segment crosses a building where path passage is not allowed - try again.");
+            foreach (var building in buildings.Where(b => !b.AllowsPassage && b.Boundary.Intersects(segment)))
+                blockingBuildings.Add(building);
+        }
+
+        if (blockingBuildings.Count > 0)
+        {
+            return Conflict(new
+            {
+                code = "path-building-conflict",
+                buildings = blockingBuildings.Select(building => new
+                {
+                    building.BuildingId,
+                    building.Name,
+                    building.Alias
+                })
+            });
         }
 
         var resolvedNodes = new List<Node>();
@@ -150,6 +166,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
             await uow.EdgeRepository.CreateAsync(edge);
         }
 
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add nodes.");
         return Ok(resolvedNodes.Select(n => n.ToDto()).ToList());
     }
@@ -210,6 +227,7 @@ public class NodeController(UserManager<AppUser> userManager, IUnitOfWork uow) :
         foreach (var edge in edges)
             await uow.EdgeRepository.DeleteAsync(edge);
 
+        await uow.RouteRepository.DeleteByCampusAsync(callerCampusId);
         await uow.NodeRepository.DeleteAsync(node);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to delete node.");
         return Ok();

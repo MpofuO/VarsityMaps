@@ -74,6 +74,7 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
         };
 
         await uow.ParkingAreaRepository.CreateAsync(parkingArea);
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to add parking area.");
 
         return Ok(parkingArea.ToDto());
@@ -105,6 +106,7 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
         parkingArea.Boundary = parkingAreaDto.Boundary;
 
         await uow.ParkingAreaRepository.UpdateAsync(parkingArea);
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to update parking area.");
 
         return Ok(parkingArea.ToDto());
@@ -128,6 +130,7 @@ public class ParkingAreaController(UserManager<AppUser> userManager, IUnitOfWork
         }
 
         await uow.ParkingAreaRepository.DeleteAsync(parkingArea);
+        await uow.RouteRepository.DeleteByCampusAsync(campusId);
         if (!await uow.CompleteAsync()) return BadRequest("Failed to delete parking area.");
 
         return Ok();

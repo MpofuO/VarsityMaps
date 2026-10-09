@@ -23,7 +23,7 @@ import { CampusNode } from '../campus-node/campus-node';
 import { CampusPaths } from '../campus-path/campus-path';
 import { isPointInPolygon, toGeoPolygon } from '../../../../core/functions/geography';
 import { CanComponentDeactivate } from '../../../../core/guards/unsaved-changes-guard';
-import { finalize, Observable, Subject, take } from 'rxjs';
+import { finalize, forkJoin, Observable, Subject, take } from 'rxjs';
 // #endregion
 
 type EditorMode = 'view' | 'draw-building'
@@ -32,6 +32,16 @@ type EditorMode = 'view' | 'draw-building'
   | 'place-parking-access'
   | 'select-edges' | 'select-path-range';
 type EditorTab = 'buildings' | 'parking-areas' | 'nodes' | 'paths';
+
+interface BuildingPathConflictResponse {
+  code: 'building-path-conflict';
+  edges: { edgeId: number; name: string | null }[];
+}
+
+interface PathBuildingConflictResponse {
+  code: 'path-building-conflict';
+  buildings: { buildingId: number; name: string; alias: string }[];
+}
 
 @Component({
   selector: 'app-campus-admin',
@@ -123,11 +133,24 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   protected readonly selectedBuildingId = signal<number | null>(null);
   protected readonly selectedParkingAreaId = signal<number | null>(null);
   protected readonly draftPath = signal<google.maps.LatLngLiteral[]>([]);
+  protected readonly isBuildingPathConflictOpen = signal(false);
+  protected readonly conflictEdgeIds = signal<Set<number>>(new Set());
+  protected readonly conflictingEdges = computed(() =>
+    this.edges().filter((edge) => this.conflictEdgeIds().has(edge.edgeId))
+  );
+  private pendingBuildingModel: BuildingModel | null = null;
   private draftBoundaryLine?: google.maps.Polyline;
   // #endregion
 
   // #region Nodes Properties
   protected readonly draftNodePath = signal<{ point: google.maps.LatLngLiteral; existingNodeId: number | null }[]>([]);
+  protected readonly isPathBuildingConflictOpen = signal(false);
+  protected readonly conflictBuildingIds = signal<Set<number>>(new Set());
+  protected readonly conflictingBuildings = computed(() =>
+    this.buildings().filter((building) => this.conflictBuildingIds().has(building.buildingId))
+  );
+  private pendingPathItems: AddNodeItem[] | null = null;
+  private pendingConnection: { fromNodeId: number; toNodeId: number } | null = null;
   protected readonly selectedNodeId = signal<number | null>(null);
   private draftPolyline?: google.maps.Polyline;
   private draftPointMarkers: google.maps.Marker[] = [];
@@ -173,7 +196,10 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   // #region Map Bindings (computed)
   protected readonly mapPolygons = computed(() => {
     const tab = this.activeTab();
-    const buildings = tab === 'buildings' ? this.buildings() : [];
+    const conflictBuildingIds = this.conflictBuildingIds();
+    const buildings = this.buildings().filter(
+      (building) => tab === 'buildings' || conflictBuildingIds.has(building.buildingId)
+    );
     const parkingAreas = tab === 'parking-areas' ? this.parkingAreas() : [];
 
     return [
@@ -181,7 +207,7 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         id: `building-${b.buildingId}`,
         paths: b.boundary.coordinates[0].slice(0, -1).map(([lng, lat]) => ({ lat, lng })),
         label: b.alias,
-        selected: b.buildingId === this.selectedBuildingId(),
+        selected: b.buildingId === this.selectedBuildingId() || conflictBuildingIds.has(b.buildingId),
         clickable: this.mode() !== 'place-nodes' || !b.allowsPassage,
         strokeColor: '#7c3aed',
         fillColor: '#8b5cf6'
@@ -233,7 +259,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   });
 
   protected readonly edgePolylines = computed<MapPolyline[]>(() => {
-    if (this.activeTab() !== 'nodes' && this.activeTab() !== 'paths') return [];
+    const conflictEdgeIds = this.conflictEdgeIds();
+    if (this.activeTab() !== 'nodes' && this.activeTab() !== 'paths' && conflictEdgeIds.size === 0) return [];
 
     const nodesById = new Map(this.nodes().map((n) => [n.nodeId, n]));
     const propertiesIds = new Set(this.edgePropertiesTarget()?.ids ?? []);
@@ -252,7 +279,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
             { lat: to.location.coordinates[1], lng: to.location.coordinates[0] }
           ],
           color: e.isEffectivelyClosed ? '#ef4444' : undefined,
-          selected: e.edgeId === selectedId || multiSelected.has(e.edgeId) || propertiesIds.has(e.edgeId)
+          selected: e.edgeId === selectedId || multiSelected.has(e.edgeId) ||
+            propertiesIds.has(e.edgeId) || conflictEdgeIds.has(e.edgeId)
         } as MapPolyline;
       })
       .filter((p): p is MapPolyline => p !== null);
@@ -293,6 +321,33 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   private handleRequestError(error: HttpErrorResponse, message: string): void {
     this.toastService.requestError(error, message);
   }
+
+  private readBuildingPathConflict(error: HttpErrorResponse): BuildingPathConflictResponse | null {
+    if (error.status !== 409 || typeof error.error !== 'object' || error.error === null) return null;
+    const body = error.error as { code?: unknown; edges?: unknown };
+    if (body.code !== 'building-path-conflict' || !Array.isArray(body.edges)) return null;
+
+    const edges = body.edges.filter((edge): edge is { edgeId: number; name: string | null } =>
+      typeof edge === 'object' && edge !== null &&
+      Number.isInteger((edge as { edgeId?: unknown }).edgeId) &&
+      ((edge as { name?: unknown }).name === null || typeof (edge as { name?: unknown }).name === 'string')
+    );
+    return { code: 'building-path-conflict', edges };
+  }
+
+  private readPathBuildingConflict(error: HttpErrorResponse): PathBuildingConflictResponse | null {
+    if (error.status !== 409 || typeof error.error !== 'object' || error.error === null) return null;
+    const body = error.error as { code?: unknown; buildings?: unknown };
+    if (body.code !== 'path-building-conflict' || !Array.isArray(body.buildings)) return null;
+
+    const buildings = body.buildings.filter((building): building is { buildingId: number; name: string; alias: string } =>
+      typeof building === 'object' && building !== null &&
+      Number.isInteger((building as { buildingId?: unknown }).buildingId) &&
+      typeof (building as { name?: unknown }).name === 'string' &&
+      typeof (building as { alias?: unknown }).alias === 'string'
+    );
+    return { code: 'path-building-conflict', buildings };
+  }
   // #endregion
 
   // #region Mode & Tab Control
@@ -326,9 +381,16 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   cancelMode(): void {
     this.mode.set('view');
     this.draftPath.set([]);
+    this.pendingBuildingModel = null;
+    this.isBuildingPathConflictOpen.set(false);
+    this.conflictEdgeIds.set(new Set());
     this.draftBoundaryLine?.setMap(null);
     this.draftBoundaryLine = undefined;
     this.draftNodePath.set([]);
+    this.pendingPathItems = null;
+    this.pendingConnection = null;
+    this.isPathBuildingConflictOpen.set(false);
+    this.conflictBuildingIds.set(new Set());
     this.draftPolyline?.setMap(null);
     this.draftPolyline = undefined;
     this.clearDraftPointMarkers();
@@ -559,15 +621,59 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
 
   handleCreateBuilding(modelData: Omit<BuildingModel, 'boundary'>): void {
     const model: BuildingModel = { ...modelData, boundary: toGeoPolygon(this.draftPath()) };
-    this.buildingService.createBuilding(model).pipe(
-      finalize(() => this.cancelMode())
-    ).subscribe({
+    this.pendingBuildingModel = model;
+    this.submitNewBuilding(model);
+  }
+
+  private submitNewBuilding(model: BuildingModel): void {
+    this.buildingService.createBuilding(model).subscribe({
       next: () => {
         this.toastService.success('Building added.');
+        this.cancelMode();
         this.load();
       },
-      error: (error) => this.handleRequestError(error, 'Unable to add building.')
+      error: (error: HttpErrorResponse) => {
+        const conflict = this.readBuildingPathConflict(error);
+        if (conflict) {
+          this.pendingBuildingModel = model;
+          this.conflictEdgeIds.set(new Set(conflict.edges.map((edge) => edge.edgeId)));
+          this.isBuildingPathConflictOpen.set(true);
+          return;
+        }
+        this.handleRequestError(error, 'Unable to add building.');
+      }
     });
+  }
+
+  allowPassageAndSaveBuilding(): void {
+    if (!this.pendingBuildingModel) return;
+    this.isBuildingPathConflictOpen.set(false);
+    this.conflictEdgeIds.set(new Set());
+    this.submitNewBuilding({ ...this.pendingBuildingModel, allowsPassage: true });
+  }
+
+  deleteConflictingPathsAndSaveBuilding(): void {
+    const model = this.pendingBuildingModel;
+    const edgeIds = Array.from(this.conflictEdgeIds());
+    if (!model || edgeIds.length === 0) return;
+
+    forkJoin(edgeIds.map((edgeId) => this.edgeService.deleteEdge(edgeId))).subscribe({
+      next: () => {
+        this.isBuildingPathConflictOpen.set(false);
+        this.conflictEdgeIds.set(new Set());
+        this.submitNewBuilding(model);
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to delete the conflicting paths.')
+    });
+  }
+
+  restartBuildingDrawing(): void {
+    this.isBuildingPathConflictOpen.set(false);
+    this.conflictEdgeIds.set(new Set());
+    this.pendingBuildingModel = null;
+    this.draftPath.set([]);
+    this.draftBoundaryLine?.setMap(null);
+    this.draftBoundaryLine = undefined;
   }
 
   handleUpdateBuilding(data: { id: number; model: Omit<BuildingModel, 'boundary'> }): void {
@@ -700,15 +806,79 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       location: p.existingNodeId ? null : { type: 'Point', coordinates: [p.point.lng, p.point.lat] }
     }));
 
-    this.nodeService.addNodes(items).pipe(
-      finalize(() => this.cancelMode())
-    ).subscribe({
+    this.pendingPathItems = items;
+    this.submitDraftPath(items);
+  }
+
+  private submitDraftPath(items: AddNodeItem[]): void {
+    this.nodeService.addNodes(items).subscribe({
       next: () => {
         this.toastService.success('Nodes added.');
+        this.cancelMode();
         this.load();
       },
-      error: (error) => this.handleRequestError(error, 'Unable to add nodes.')
+      error: (error: HttpErrorResponse) => {
+        const conflict = this.readPathBuildingConflict(error);
+        if (conflict) {
+          this.pendingPathItems = items;
+          this.conflictBuildingIds.set(new Set(conflict.buildings.map((building) => building.buildingId)));
+          this.isPathBuildingConflictOpen.set(true);
+          return;
+        }
+        this.handleRequestError(error, 'Unable to add nodes.');
+      }
     });
+  }
+
+  allowPassageAndRetryPath(): void {
+    const items = this.pendingPathItems;
+    const buildings = this.conflictingBuildings();
+    if (!items && !this.pendingConnection) return;
+    if (buildings.length === 0) {
+      this.toastService.error('Unable to find the blocking buildings. Reload the map and try again.');
+      return;
+    }
+
+    forkJoin(buildings.map((building) =>
+      this.buildingService.updateBuilding(building.buildingId, {
+        name: building.name,
+        alias: building.alias,
+        isAccessible: building.isAccessible,
+        isGuestAccessible: building.isGuestAccessible,
+        allowsPassage: true,
+        boundary: building.boundary
+      })
+    )).subscribe({
+      next: () => {
+        this.buildings.update((current) => current.map((building) =>
+          this.conflictBuildingIds().has(building.buildingId)
+            ? { ...building, allowsPassage: true }
+            : building
+        ));
+        this.isPathBuildingConflictOpen.set(false);
+        this.conflictBuildingIds.set(new Set());
+        if (items) {
+          this.submitDraftPath(items);
+        } else {
+          const connection = this.pendingConnection;
+          if (connection) this.submitEdgeConnection(connection.fromNodeId, connection.toNodeId);
+        }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to allow passage through the blocking building(s).')
+    });
+  }
+
+  restartPathDrawing(): void {
+    this.isPathBuildingConflictOpen.set(false);
+    this.conflictBuildingIds.set(new Set());
+    this.pendingPathItems = null;
+    this.pendingConnection = null;
+    this.draftNodePath.set([]);
+    this.draftPolyline?.setMap(null);
+    this.draftPolyline = undefined;
+    this.clearDraftPointMarkers();
+    this.connectFirstNodeId.set(null);
+    this.connectSecondNodeId.set(null);
   }
 
   handleRenameNode(event: { id: number; name: string | null; interestOfEntrance: string | null }): void {
@@ -875,13 +1045,26 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
     const second = this.connectSecondNodeId();
     if (first === null || second === null) return;
 
-    this.edgeService.addEdge(first, second).subscribe({
+    this.submitEdgeConnection(first, second);
+  }
+
+  private submitEdgeConnection(fromNodeId: number, toNodeId: number): void {
+    this.edgeService.addEdge(fromNodeId, toNodeId).subscribe({
       next: () => {
         this.toastService.success('Nodes connected.');
         this.cancelMode();
         this.load();
       },
-      error: (error) => this.handleRequestError(error, 'Unable to connect nodes.')
+      error: (error: HttpErrorResponse) => {
+        const conflict = this.readPathBuildingConflict(error);
+        if (conflict) {
+          this.pendingConnection = { fromNodeId, toNodeId };
+          this.conflictBuildingIds.set(new Set(conflict.buildings.map((building) => building.buildingId)));
+          this.isPathBuildingConflictOpen.set(true);
+          return;
+        }
+        this.handleRequestError(error, 'Unable to connect nodes.');
+      }
     });
   }
 
