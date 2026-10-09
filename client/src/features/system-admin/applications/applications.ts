@@ -44,7 +44,10 @@ export class Applications implements OnInit {
 
   private load(): void {
     this.universityService.getApplications().subscribe({
-      next: (applications) => this.applications.set(applications)
+      next: (applications) => this.applications.set(applications),
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load applications.');
+      }
     });
   }
 
@@ -57,6 +60,9 @@ export class Applications implements OnInit {
       next: () => {
         this.toastService.success(`${application.universityName} approved.`);
         this.load();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, `Unable to approve ${application.universityName}.`);
       }
     });
   }
@@ -84,6 +90,9 @@ export class Applications implements OnInit {
         this.toastService.success(`${application.universityName} rejected.`);
         this.closeReject();
         this.load();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, `Unable to reject ${application.universityName}.`);
       }
     });
   }

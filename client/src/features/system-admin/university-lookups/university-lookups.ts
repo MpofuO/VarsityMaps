@@ -42,7 +42,10 @@ export class UniversityLookups implements OnInit {
   private load(): void {
     this.lookupService.getAll().subscribe({
       next: (lookups) => this.lookups.set(lookups),
-      error: () => this.lookups.set([])
+      error: (error) => {
+        this.lookups.set([]);
+        this.toastService.requestError(error, 'Unable to load location lookups.');
+      }
     });
   }
 
@@ -96,7 +99,10 @@ export class UniversityLookups implements OnInit {
         this.isSaving.set(false);
         this.closeEditor();
       },
-      error: () => this.isSaving.set(false)
+      error: (error) => {
+        this.isSaving.set(false);
+        this.toastService.requestError(error, selected ? 'Unable to update location lookup.' : 'Unable to add location lookup.');
+      }
     });
   }
 
@@ -119,6 +125,9 @@ export class UniversityLookups implements OnInit {
         );
         this.toastService.success('Location lookup deleted.');
         this.closeDeleteConfirmation();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to delete location lookup.');
       }
     });
   }

@@ -36,8 +36,9 @@ export class Login {
         this.router.navigate([roleHomeRoute(role)]);
         this.toastService.success('Signed in successfully.');
       },
-          error: () => {
-          }
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to sign in. Please check your credentials and try again.');
+      }
     });
   }
 }

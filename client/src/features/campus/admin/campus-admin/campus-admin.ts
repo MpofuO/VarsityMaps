@@ -1,5 +1,6 @@
 // #region Imports
 import { Component, HostListener, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { BuildingService } from '../../../../core/services/building-service';
 import { ParkingAreaService } from '../../../../core/services/parking-area-service';
 import { CampusService } from '../../../../core/services/campus-service';
@@ -262,16 +263,35 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
   ngOnInit(): void {
     const userCampusId = this.accountService.currentUser()?.campusId;
     if (userCampusId) {
-      this.campusService.getCampus(userCampusId).subscribe({ next: (c) => this.campus.set(c) });
+      this.campusService.getCampus(userCampusId).subscribe({
+        next: (c) => this.campus.set(c),
+        error: (error) => this.handleRequestError(error, 'Unable to load campus details.')
+      });
     }
     this.load();
   }
 
   private load(): void {
-    this.buildingService.getBuildings().subscribe({ next: (b) => this.buildings.set(b) });
-    this.parkingAreaService.getParkingAreas().subscribe({ next: (p) => this.parkingAreas.set(p) });
-    this.nodeService.getNodes().subscribe({ next: (n) => this.nodes.set(n) });
-    this.edgeService.getEdges().subscribe({ next: (e) => this.edges.set(e) });
+    this.buildingService.getBuildings().subscribe({
+      next: (b) => this.buildings.set(b),
+      error: (error) => this.handleRequestError(error, 'Unable to load buildings.')
+    });
+    this.parkingAreaService.getParkingAreas().subscribe({
+      next: (p) => this.parkingAreas.set(p),
+      error: (error) => this.handleRequestError(error, 'Unable to load parking areas.')
+    });
+    this.nodeService.getNodes().subscribe({
+      next: (n) => this.nodes.set(n),
+      error: (error) => this.handleRequestError(error, 'Unable to load map nodes.')
+    });
+    this.edgeService.getEdges().subscribe({
+      next: (e) => this.edges.set(e),
+      error: (error) => this.handleRequestError(error, 'Unable to load paths.')
+    });
+  }
+
+  private handleRequestError(error: HttpErrorResponse, message: string): void {
+    this.toastService.requestError(error, message);
   }
   // #endregion
 
@@ -545,7 +565,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Building added.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to add building.')
     });
   }
 
@@ -558,7 +579,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Building updated.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to update building.')
     });
   }
 
@@ -567,7 +589,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Building deleted.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to delete building.')
     });
   }
 
@@ -579,7 +602,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Parking area added.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to add parking area.')
     });
   }
 
@@ -592,7 +616,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Parking area updated.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to update parking area.')
     });
   }
 
@@ -601,7 +626,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Parking area deleted.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to delete parking area.')
     });
   }
 
@@ -680,7 +706,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Nodes added.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to add nodes.')
     });
   }
 
@@ -689,7 +716,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Node updated.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to update node.')
     });
   }
 
@@ -698,7 +726,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Node deleted.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to delete node.')
     });
   }
 
@@ -787,7 +816,10 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         this.cancelMode();
         this.load();
       },
-      error: () => this.isEntranceConfirmOpen.set(false)
+      error: (error) => {
+        this.isEntranceConfirmOpen.set(false);
+        this.handleRequestError(error, 'Unable to add entrance.');
+      }
     });
   }
 
@@ -807,7 +839,10 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         this.cancelMode();
         this.load();
       },
-      error: () => this.isParkingAccessConfirmOpen.set(false)
+      error: (error) => {
+        this.isParkingAccessConfirmOpen.set(false);
+        this.handleRequestError(error, 'Unable to add parking access node.');
+      }
     });
   }
   // #endregion
@@ -845,7 +880,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
         this.toastService.success('Nodes connected.');
         this.cancelMode();
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to connect nodes.')
     });
   }
 
@@ -969,7 +1005,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
           this.toastService.success('Path updated.');
           this.cancelMode();
           this.load();
-        }
+        },
+        error: (error) => this.handleRequestError(error, 'Unable to update path.')
       });
     } else {
       this.edgeService.bulkUpdateEdges(target.ids, this.propertiesIsClosed(), closedUntil, travelModes).subscribe({
@@ -977,7 +1014,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
           this.toastService.success(`${target.ids.length} paths updated.`);
           this.cancelMode();
           this.load();
-        }
+        },
+        error: (error) => this.handleRequestError(error, 'Unable to update paths.')
       });
     }
   }
@@ -994,7 +1032,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
       next: () => {
         this.toastService.success('Path removed.');
         this.load();
-      }
+      },
+      error: (error) => this.handleRequestError(error, 'Unable to remove path.')
     });
   }
 
@@ -1013,7 +1052,8 @@ export class CampusAdmin implements OnInit, CanComponentDeactivate {
             this.cancelMode();
             this.load();
           }
-        }
+        },
+        error: (error) => this.handleRequestError(error, 'Unable to delete path(s).')
       });
     });
   }

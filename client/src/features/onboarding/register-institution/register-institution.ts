@@ -98,6 +98,9 @@ export class RegisterInstitution implements OnInit {
       next: () => {
         this.toastService.success('Application submitted successfully.');
         this.router.navigate(['/']);
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to submit application.');
       }
     });
   }

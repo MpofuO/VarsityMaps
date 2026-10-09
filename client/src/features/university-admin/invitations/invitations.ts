@@ -9,7 +9,7 @@ import { Campus } from '../../../types/campus';
 import { Modal } from '../../../shared/modal/modal';
 import { TextInput } from '../../../shared/text-input/text-input';
 import { SelectInput } from '../../../shared/select-input/select-input';
-import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
 import { DatePipe } from '@angular/common';
 
 export type InvitationStatusFilter = 'all' | 'pending' | 'accepted' | 'declined' | 'expired' | 'locked' | 'revoked';
@@ -113,7 +113,10 @@ export class Invitations implements OnInit {
 
   private load(): void {
     this.invitationService.getInvitations().subscribe({
-      next: (invitations) => this.invitations.set(invitations)
+      next: (invitations) => this.invitations.set(invitations),
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load invitations.');
+      }
     });
 
     this.campusService.getCampuses().pipe(
@@ -123,7 +126,9 @@ export class Invitations implements OnInit {
         const adminChecks$ = campuses.map(campus =>
           this.campusService.getCampusAdmin(campus.campusId).pipe(
             map(admin => ({ campus, hasAdmin: admin !== null && admin !== undefined })),
-            catchError(() => of({ campus, hasAdmin: false }))
+            catchError(error => error.status === 400 || error.status === 0
+              ? throwError(() => error)
+              : of({ campus, hasAdmin: false }))
           )
         );
 
@@ -137,7 +142,10 @@ export class Invitations implements OnInit {
       )
     ).subscribe({
       next: (availableCampuses) => this.campuses.set(availableCampuses),
-      error: (err) => console.error('Error fetching campuses', err)
+      error: (error) => {
+        console.error('Error fetching campuses', error);
+        this.toastService.requestError(error, 'Unable to load campuses for invitations.');
+      }
     });
   }
 
@@ -184,6 +192,9 @@ export class Invitations implements OnInit {
             this.createForm.reset({ inviteeName: '', inviteeEmail: '', campusId: null, duration: 7 });
             this.closeCreate();
             this.load();
+          },
+          error: (error) => {
+            this.toastService.requestError(error, 'Unable to send invitation.');
           }
         });
       },
@@ -218,6 +229,9 @@ export class Invitations implements OnInit {
         this.toastService.success('Invitation duration updated.');
         this.closeDuration();
         this.load();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to update invitation duration.');
       }
     });
   }
@@ -243,6 +257,9 @@ export class Invitations implements OnInit {
         this.toastService.success('Invitation revoked.');
         this.closeRevoke();
         this.load();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to revoke invitation.');
       }
     });
   }
@@ -256,6 +273,9 @@ export class Invitations implements OnInit {
       next: () => {
         this.toastService.success('Invitation resent.');
         this.load();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to resend invitation.');
       }
     });
   }

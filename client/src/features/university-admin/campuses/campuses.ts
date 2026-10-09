@@ -79,6 +79,9 @@ export class Campuses implements OnInit {
         this.campuses.set(campuses.filter((c) => c.universityId === universityId));
         this.form.controls.name.updateValueAndValidity({ onlySelf: true });
         this.form.controls.alias.updateValueAndValidity({ onlySelf: true });
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load campuses.');
       }
     });
   }
@@ -124,10 +127,11 @@ export class Campuses implements OnInit {
         this.campusAdmin.set(admin);
         this.isLoadingAdmin.set(false);
       },
-      error: () => {
+      error: (error) => {
         if (this.adminCampus()?.campusId === campusId) {
           this.isLoadingAdmin.set(false);
         }
+        this.toastService.requestError(error, 'Unable to load campus administrator details.');
       }
     });
   }
@@ -142,6 +146,9 @@ export class Campuses implements OnInit {
       next: () => {
         this.toastService.success(suspend ? 'Admin suspended.' : 'Suspension revoked.');
         this.loadCampusAdmin(campus.campusId);
+      },
+      error: (error) => {
+        this.toastService.requestError(error, suspend ? 'Unable to suspend admin.' : 'Unable to revoke suspension.');
       }
     });
   }
@@ -163,6 +170,9 @@ export class Campuses implements OnInit {
         this.toastService.success('Admin unassigned — the account has been deleted.');
         this.campusAdmin.set(null);
         this.closeUnassignConfirm();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to unassign campus admin.');
       }
     });
   }
@@ -209,6 +219,9 @@ export class Campuses implements OnInit {
         this.toastService.success(editing ? 'Campus updated.' : 'Campus created.');
         this.closeForm();
         this.load();
+      },
+      error: (error) => {
+        this.toastService.requestError(error, editing ? 'Unable to update campus.' : 'Unable to create campus.');
       }
     });
   }

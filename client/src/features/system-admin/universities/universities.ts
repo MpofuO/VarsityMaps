@@ -3,6 +3,7 @@ import { UniversityService } from '../../../core/services/university-service';
 import { University } from '../../../types/university';
 import { Campus } from '../../../types/campus';
 import { Modal } from '../../../shared/modal/modal';
+import { ToastService } from '../../../core/services/toast-service';
 
 @Component({
   selector: 'app-universities',
@@ -13,6 +14,7 @@ import { Modal } from '../../../shared/modal/modal';
 })
 export class Universities implements OnInit {
   private readonly universityService = inject(UniversityService);
+  private readonly toastService = inject(ToastService);
 
   protected readonly universities = signal<University[]>([]);
   protected readonly selectedUniversity = signal<University | null>(null);
@@ -22,7 +24,11 @@ export class Universities implements OnInit {
   ngOnInit(): void {
     this.universityService.getUniversities().subscribe({
       next: (universities) => {
-        this.universities.set(universities)}
+        this.universities.set(universities);
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load universities.');
+      }
     });
   }
 
@@ -33,7 +39,10 @@ export class Universities implements OnInit {
 
     this.universityService.getCampuses(university.universityId).subscribe({
       next: (campuses) => this.campuses.set(campuses),
-      error: () => this.campuses.set([])
+      error: (error) => {
+        this.campuses.set([]);
+        this.toastService.requestError(error, 'Unable to load university campuses.');
+      }
     });
   }
 

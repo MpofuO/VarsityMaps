@@ -246,7 +246,10 @@ export class Student implements OnInit, OnDestroy {
 
   private loadBuildings(): void {
     this.buildingService.getBuildings().subscribe({
-      next: (buildings) => this.buildings.set(buildings)
+      next: (buildings) => this.buildings.set(buildings),
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load buildings.');
+      }
     });
   }
 
@@ -263,6 +266,9 @@ export class Student implements OnInit, OnDestroy {
           this.campusCenter.set(point);
           this.centerMapOnBoundsIfNeeded([[campus.center.coordinates[0], campus.center.coordinates[1]]], true);
         }
+      },
+      error: (error) => {
+        this.toastService.requestError(error, 'Unable to load campus details.');
       }
     });
   }

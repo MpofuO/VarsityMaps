@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { httpErrorMessage } from '../functions/http-error-message';
 
 @Injectable({ providedIn: 'root' })
 export class ToastService {
@@ -21,12 +23,22 @@ export class ToastService {
 
     const toast = document.createElement('div');
     toast.className = `alert ${alertClass} shadow-lg flex items-center justify-between`;
-    toast.innerHTML = `
-      <div class="flex-1"><span>${message}</span></div>
-      <div class="ml-4"><button class="btn btn-ghost btn-sm">✕</button></div>
-    `;
+    const messageContainer = document.createElement('div');
+    messageContainer.className = 'flex-1';
+    const messageText = document.createElement('span');
+    messageText.textContent = message;
+    messageContainer.appendChild(messageText);
 
-    toast.querySelector('button')?.addEventListener('click', () => {
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'ml-4';
+    const closeButton = document.createElement('button');
+    closeButton.className = 'btn btn-ghost btn-sm';
+    closeButton.textContent = '✕';
+    buttonContainer.appendChild(closeButton);
+
+    toast.append(messageContainer, buttonContainer);
+
+    closeButton.addEventListener('click', () => {
       toastContainer.removeChild(toast);
     });
 
@@ -43,6 +55,12 @@ export class ToastService {
 
   error(message: string, duration?: number) {
     this.createToastElement(message, 'alert-error', duration ?? 3500);
+  }
+
+  requestError(error: HttpErrorResponse, fallback: string): void {
+    if (error.status === 400 || error.status === 0) {
+      this.error(httpErrorMessage(error, fallback));
+    }
   }
 
   warning(message: string, duration?: number) {

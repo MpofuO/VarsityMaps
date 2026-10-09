@@ -3,6 +3,7 @@ import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest
 import { Router } from '@angular/router';
 import { Observable, catchError, throwError } from 'rxjs';
 import { ToastService } from '../services/toast-service';
+import { httpErrorMessage } from '../functions/http-error-message';
 
 @Injectable()
 export class ErrorInterceptor implements HttpInterceptor {
@@ -14,7 +15,7 @@ export class ErrorInterceptor implements HttpInterceptor {
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     return next.handle(request).pipe(
       catchError((error: HttpErrorResponse) => {
-        const message = this.extractMessage(error);
+        const message = httpErrorMessage(error, error.message || 'Something went wrong.');
         if (error.status === 409) {
           this.toastService.warning(message);
         } else if (error.status > 400 && error.status < 500) {
@@ -32,20 +33,4 @@ export class ErrorInterceptor implements HttpInterceptor {
     );
   }
 
-  private extractMessage(error: HttpErrorResponse): string {
-    if (typeof error.error === 'string') {
-      return error.error;
-    }
-
-    if (error.error?.errors) {
-      const values = Object.values(error.error.errors).flat() as string[];
-      return values.join(' ');
-    }
-
-    if (error.error?.message) {
-      return error.error.message;
-    }
-
-    return error.message || 'Something went wrong.';
-  }
 }
