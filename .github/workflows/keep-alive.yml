@@ -1,9 +1,6 @@
 name: Keep Azure SQL Warm
 
 on:
-  schedule:
-    # Runs every 30 minutes
-    - cron: '*/30 * * * *'
   workflow_dispatch: # Allows manual triggering from GitHub UI
 
 jobs:
