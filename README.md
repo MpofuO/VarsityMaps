@@ -288,16 +288,11 @@ Open `http://localhost:4200`.
 
 Varsity Maps is under active development. Next up:
 
-- [ ] Automated test suite, starting with the routing engine, guidance generation and the soft-delete flow
-- [ ] Robust token refresh (401, refresh, retry) and rate limiting on login and PIN endpoints
-- [ ] Persist navigation sessions across page reloads
-- [ ] Database-enforced uniqueness (filtered unique indexes) and optimistic concurrency
 - [ ] Layered, mode-aware routing graph for globally optimal park-and-walk, and genuine alternative routes
 - [ ] Lazy-loaded role areas and smaller bundles
 - [ ] Accessibility-optimised routing
 - [ ] Indoor and multi-floor navigation
-- [ ] Real identity-provider verification for students and staff
-- [ ] Installable PWA experience for phones
+- [ ] Installable mobile application for phones
 
 Ideas and feedback are welcome via [issues](../../issues).
 
