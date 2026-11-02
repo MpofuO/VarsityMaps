@@ -179,7 +179,7 @@ A few decisions I'm proud of, and why:
 | Email | MailKit (SMTP) |
 | Hosting | Microsoft Azure |
 
-![Entity relationship diagram](docs/diagrams/erd.png)
+![Entity relationship diagram](docs/screenshots/erd.png)
 
 ---
 
